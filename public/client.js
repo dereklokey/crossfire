@@ -404,21 +404,37 @@ function drawBoard(board) {
 }
 
 function drawPiece(p) {
+  const palette = {
+    circle: { hi: '#f9f2cc', lo: '#d8b86e', edge: '#9a7c3a' },
+    triangle: { hi: '#dff3ff', lo: '#79b7d8', edge: '#3e7f9f' },
+    square: { hi: '#e7f8df', lo: '#8fc77a', edge: '#4e8b3c' },
+    hex: { hi: '#ffe6ef', lo: '#d993b0', edge: '#95506d' },
+    star6: { hi: '#f6e8ff', lo: '#b996e1', edge: '#7750a3' },
+    star8: { hi: '#ffe8dd', lo: '#df9f83', edge: '#9a5f49' },
+  };
+  const c = palette[p.shape] || palette.circle;
+
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.angle || 0);
-  const g = ctx.createRadialGradient(-p.r * 0.25, -p.r * 0.35, p.r * 0.15, 0, 0, p.r * 1.05);
-  g.addColorStop(0, '#f5fbf9');
-  g.addColorStop(1, '#c7e2da');
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  const g = ctx.createRadialGradient(-p.r * 0.32, -p.r * 0.36, p.r * 0.12, 0, 0, p.r * 1.05);
+  g.addColorStop(0, c.hi);
+  g.addColorStop(1, c.lo);
   ctx.fillStyle = g;
-  ctx.strokeStyle = '#88c2b6';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = c.edge;
+  ctx.lineWidth = 2.2;
 
   if (p.shape === 'triangle') {
     ctx.beginPath();
-    ctx.moveTo(0, -p.r);
-    ctx.lineTo(p.r * 0.9, p.r * 0.8);
-    ctx.lineTo(-p.r * 0.9, p.r * 0.8);
+    for (let i = 0; i < 3; i++) {
+      const a = -Math.PI / 2 + i * (Math.PI * 2 / 3);
+      const x = Math.cos(a) * p.r;
+      const y = Math.sin(a) * p.r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -471,6 +487,23 @@ function drawPiece(p) {
     ctx.fill();
     ctx.stroke();
   }
+
+  ctx.shadowBlur = 0;
+  // Center-weight marker: subtle metallic core with ring.
+  const coreOffsetY = 0;
+  ctx.translate(0, coreOffsetY);
+  const core = ctx.createRadialGradient(-1, -1, 0.5, 0, 0, p.r * 0.29);
+  core.addColorStop(0, '#f4fbff');
+  core.addColorStop(1, '#8ea4b4');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(0, 0, p.r * 0.24, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(24, 36, 46, 0.45)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, p.r * 0.31, 0, Math.PI * 2);
+  ctx.stroke();
 
   ctx.restore();
 }
