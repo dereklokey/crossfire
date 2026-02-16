@@ -196,7 +196,7 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
     pieceSetting,
     pieceCount,
     piecesNeeded: Math.floor(pieceCount / 2) + 1,
-    state: mode === 'single' ? 'countdown' : 'lobby',
+    state: 'lobby',
     startedAt: Date.now(),
     countdownMs: 1800,
     players,
@@ -377,13 +377,14 @@ function scoreIfGoal(room, piece) {
 }
 
 function collectAmmoIfGoal(room, shot, prevX) {
-  // Ammo is collected only when it crosses the opposing player's goal line.
-  if (shot.owner === 0 && prevX < BOARD.goalRightX && shot.x >= BOARD.goalRightX) {
-    room.players[1].bin += 1;
+  // Collect when a pellet crosses from the field into either endzone.
+  // Left goal belongs to player 0, right goal belongs to player 1.
+  if (prevX > BOARD.goalLeftX && shot.x <= BOARD.goalLeftX) {
+    room.players[0].bin += 1;
     return true;
   }
-  if (shot.owner === 1 && prevX > BOARD.goalLeftX && shot.x <= BOARD.goalLeftX) {
-    room.players[0].bin += 1;
+  if (prevX < BOARD.goalRightX && shot.x >= BOARD.goalRightX) {
+    room.players[1].bin += 1;
     return true;
   }
   return false;
@@ -490,7 +491,7 @@ function roomSnapshot(room, forPlayer) {
       connected: p.connected,
       isAI: p.isAI,
     })),
-    projectiles: room.projectiles.map((s) => ({ x: s.x, y: s.y, r: s.radius })),
+    projectiles: room.projectiles.map((s) => ({ x: s.x, y: s.y, r: s.radius, owner: s.owner })),
     pieces: room.pieces.map((p) => ({
       id: p.id,
       x: p.x,
@@ -580,6 +581,15 @@ function tickRoom(room, now) {
     shot.vy *= 0.999;
 
     collideWithBounds(shot, 0.85);
+
+    // Keep pellets inside the board's horizontal extents.
+    if (shot.x - shot.radius < 0) {
+      shot.x = shot.radius;
+      shot.vx = Math.abs(shot.vx) * 0.85;
+    } else if (shot.x + shot.radius > BOARD.width) {
+      shot.x = BOARD.width - shot.radius;
+      shot.vx = -Math.abs(shot.vx) * 0.85;
+    }
 
     let consumed = false;
     for (const piece of room.pieces) {
@@ -754,7 +764,7 @@ const server = http.createServer(async (req, res) => {
       if (player.side !== 0) return badRequest(res, 'Only host can rematch');
       if (room.state !== 'finished') return badRequest(res, 'Match is not finished');
 
-      resetMatch(room, room.mode === 'network');
+      resetMatch(room, true);
       room.updatedAt = Date.now();
 
       json(res, 200, { ok: true, state: room.state });

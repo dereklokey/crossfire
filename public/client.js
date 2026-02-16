@@ -6,6 +6,7 @@ const pieceBlock = document.getElementById('pieceBlock');
 const aiBlock = document.getElementById('aiBlock');
 const createBlock = document.getElementById('createBlock');
 const joinBlock = document.getElementById('joinBlock');
+const roomBlock = document.getElementById('roomBlock');
 const pieceSelect = document.getElementById('pieceSelect');
 const aiSelect = document.getElementById('aiSelect');
 const createBtn = document.getElementById('createBtn');
@@ -46,6 +47,7 @@ function renderSetupMode() {
   aiBlock.classList.toggle('hidden-ui', !isSingle);
   createBlock.classList.toggle('hidden-ui', isJoin);
   joinBlock.classList.toggle('hidden-ui', !isJoin);
+  roomBlock.classList.toggle('hidden-ui', isSingle);
 
   createBtn.textContent = isSingle ? 'Create Single Player Match' : 'Create Multiplayer Room';
 }
@@ -296,7 +298,9 @@ async function pollStateTick() {
     const me = data.players[data.me];
     const them = data.players[1 - data.me];
     if (data.state === 'lobby') {
-      if (data.me === 0) {
+      if (data.mode === 'single') {
+        setStatus(`Single-player ready. Press Start Match.`);
+      } else if (data.me === 0) {
         const ready = data.players[1].connected ? 'Opponent connected. Press Start Match.' : 'Waiting for opponent to join.';
         setStatus(`Room ${data.roomId} | Host | ${ready}`);
       } else {
@@ -310,7 +314,11 @@ async function pollStateTick() {
 
     if (data.state === 'lobby') {
       overlay.classList.remove('hidden');
-      overlay.textContent = data.me === 0 ? 'Press Start Match' : 'Waiting For Host';
+      if (data.mode === 'single') {
+        overlay.textContent = 'Press Start Match';
+      } else {
+        overlay.textContent = data.me === 0 ? 'Press Start Match' : 'Waiting For Host';
+      }
     } else if (data.state === 'countdown') {
       overlay.classList.remove('hidden');
       overlay.textContent = `Match starts in ${Math.ceil(data.countdownMs / 1000)}`;
@@ -326,34 +334,66 @@ async function pollStateTick() {
 }
 
 function drawGoalLines(board) {
-  ctx.strokeStyle = '#7ac5e4';
-  ctx.lineWidth = 3;
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = 'rgba(122, 197, 228, 0.55)';
+  ctx.strokeStyle = '#7ad4ff';
+  ctx.lineWidth = 3.5;
   ctx.beginPath();
   ctx.moveTo(board.goalLeftX, board.top);
   ctx.lineTo(board.goalLeftX, board.bottom);
   ctx.stroke();
 
-  ctx.strokeStyle = '#f0a183';
+  ctx.shadowColor = 'rgba(240, 161, 131, 0.5)';
+  ctx.strokeStyle = '#ffb298';
   ctx.beginPath();
   ctx.moveTo(board.goalRightX, board.top);
   ctx.lineTo(board.goalRightX, board.bottom);
   ctx.stroke();
+  ctx.shadowBlur = 0;
 }
 
 function drawBoard(board) {
   const grad = ctx.createLinearGradient(0, 0, 0, board.height);
-  grad.addColorStop(0, '#132739');
-  grad.addColorStop(1, '#0d1b28');
+  grad.addColorStop(0, '#12283a');
+  grad.addColorStop(1, '#0c1a27');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, board.width, board.height);
 
-  ctx.strokeStyle = '#2e4f64';
-  ctx.lineWidth = 3;
+  const sheen = ctx.createRadialGradient(board.width / 2, board.height / 2, 80, board.width / 2, board.height / 2, board.width * 0.6);
+  sheen.addColorStop(0, 'rgba(108, 168, 196, 0.14)');
+  sheen.addColorStop(1, 'rgba(108, 168, 196, 0)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, board.width, board.height);
+
+  ctx.strokeStyle = '#3b627a';
+  ctx.lineWidth = 2.5;
   ctx.strokeRect(2, board.top, board.width - 4, board.bottom - board.top);
+
+  ctx.strokeStyle = 'rgba(114, 173, 203, 0.12)';
+  ctx.lineWidth = 1;
+  for (let y = board.top + 22; y < board.bottom; y += 22) {
+    ctx.beginPath();
+    ctx.moveTo(4, y);
+    ctx.lineTo(board.width - 4, y);
+    ctx.stroke();
+  }
+
+  // Subtle endzone fills.
+  const leftZone = ctx.createLinearGradient(0, 0, board.goalLeftX, 0);
+  leftZone.addColorStop(0, 'rgba(122, 212, 255, 0.12)');
+  leftZone.addColorStop(1, 'rgba(122, 212, 255, 0.02)');
+  ctx.fillStyle = leftZone;
+  ctx.fillRect(0, board.top, board.goalLeftX, board.bottom - board.top);
+
+  const rightZone = ctx.createLinearGradient(board.goalRightX, 0, board.width, 0);
+  rightZone.addColorStop(0, 'rgba(255, 178, 152, 0.02)');
+  rightZone.addColorStop(1, 'rgba(255, 178, 152, 0.12)');
+  ctx.fillStyle = rightZone;
+  ctx.fillRect(board.goalRightX, board.top, board.width - board.goalRightX, board.bottom - board.top);
 
   drawGoalLines(board);
 
-  ctx.strokeStyle = '#2f5970';
+  ctx.strokeStyle = '#4d7894';
   ctx.lineWidth = 1;
   ctx.setLineDash([7, 7]);
   ctx.beginPath();
@@ -367,8 +407,11 @@ function drawPiece(p) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.angle || 0);
-  ctx.fillStyle = '#d9ece7';
-  ctx.strokeStyle = '#8ec8bc';
+  const g = ctx.createRadialGradient(-p.r * 0.25, -p.r * 0.35, p.r * 0.15, 0, 0, p.r * 1.05);
+  g.addColorStop(0, '#f5fbf9');
+  g.addColorStop(1, '#c7e2da');
+  ctx.fillStyle = g;
+  ctx.strokeStyle = '#88c2b6';
   ctx.lineWidth = 2;
 
   if (p.shape === 'triangle') {
@@ -435,32 +478,95 @@ function drawPiece(p) {
 function drawGun(side, angle, playerState) {
   const x = side === 0 ? 60 : 1140;
   const y = 350;
+  const team = side === 0 ? '#6ac6ec' : '#ef9575';
+  const teamGlow = side === 0 ? 'rgba(106, 198, 236, 0.42)' : 'rgba(239, 149, 117, 0.42)';
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = teamGlow;
 
-  ctx.fillStyle = side === 0 ? '#6ac6ec' : '#ef9575';
+  // Low-profile pedestal.
+  const baseGrad = ctx.createRadialGradient(-2, -3, 2, 0, 0, 24);
+  baseGrad.addColorStop(0, '#253c4d');
+  baseGrad.addColorStop(1, '#101f2c');
+  ctx.fillStyle = baseGrad;
   ctx.beginPath();
-  ctx.arc(0, 0, 20, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 24, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Team ring.
+  ctx.strokeStyle = team;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 19.5, 16.5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Core hub.
+  const pivotGrad = ctx.createRadialGradient(-3, -3, 2, 0, 0, 13);
+  pivotGrad.addColorStop(0, '#e8f3fa');
+  pivotGrad.addColorStop(1, '#6a8597');
+  ctx.fillStyle = pivotGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.rotate(angle);
-  ctx.fillStyle = '#d8eaf2';
-  ctx.fillRect(0, -5, 34, 10);
+  ctx.shadowBlur = 0;
+
+  // Armored body.
+  const bodyGrad = ctx.createLinearGradient(0, -12, 0, 12);
+  bodyGrad.addColorStop(0, '#d9e8f2');
+  bodyGrad.addColorStop(1, '#7d97ab');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(-1, -10);
+  ctx.lineTo(10, -12);
+  ctx.lineTo(27, -8);
+  ctx.lineTo(27, 8);
+  ctx.lineTo(10, 12);
+  ctx.lineTo(-1, 10);
+  ctx.closePath();
+  ctx.fill();
+
+  // Twin rail barrel.
+  ctx.fillStyle = '#5f7a8d';
+  ctx.fillRect(24, -8, 22, 5);
+  ctx.fillRect(24, 3, 22, 5);
+  ctx.fillStyle = '#d0deea';
+  ctx.fillRect(24, -2, 22, 4);
+
+  // Muzzle block.
+  ctx.fillStyle = '#86a3b8';
+  ctx.fillRect(46, -9, 7, 18);
+
+  // Bore.
+  ctx.fillStyle = '#1a2630';
+  ctx.beginPath();
+  ctx.arc(53, 0, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Accent strip and core light.
+  ctx.fillStyle = team;
+  ctx.globalAlpha = 0.9;
+  ctx.fillRect(4, -8, 3, 16);
+  ctx.globalAlpha = 0.75;
+  ctx.fillRect(15, -1.5, 12, 3);
+  ctx.globalAlpha = 1;
 
   ctx.restore();
 
   if (playerState.reloading) {
     ctx.fillStyle = '#ffe08b';
-    ctx.font = 'bold 14px Trebuchet MS';
+    ctx.font = '700 14px "Space Grotesk", "Trebuchet MS", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('RELOADING', x, y - 30);
   }
 }
 
 function drawProjectiles(projectiles) {
-  ctx.fillStyle = '#ffe7a1';
   for (const s of projectiles) {
+    ctx.fillStyle = s.owner === 0 ? '#74d9ff' : '#ffb08e';
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fill();
@@ -494,7 +600,7 @@ function drawHUD(data) {
 
   function drawBarValue(x, y, h, value, color = '#d7e7f2') {
     ctx.fillStyle = color;
-    ctx.font = 'bold 13px Trebuchet MS';
+    ctx.font = '700 13px "Space Grotesk", "Trebuchet MS", sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(String(value), x - 8, y + h - 2);
   }
@@ -505,14 +611,14 @@ function drawHUD(data) {
     ctx.save();
     ctx.globalAlpha = pulse;
     ctx.fillStyle = tint;
-    ctx.font = 'bold 16px Trebuchet MS';
+    ctx.font = '700 16px "Space Grotesk", "Trebuchet MS", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('RELOAD!', centerX, y);
     ctx.restore();
   }
 
   ctx.fillStyle = '#cfe2ef';
-  ctx.font = 'bold 18px Trebuchet MS';
+  ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText(`P1 Score: ${data.players[0].score}`, 18, 32);
   ctx.fillText(`P2 Score: ${data.players[1].score}`, 1010, 32);
@@ -522,7 +628,7 @@ function drawHUD(data) {
 
   const barW = 220;
   const barH = 14;
-  const leftX = 24;
+  const leftX = 34;
   const rightX = 1200 - barW - 24;
   const topY = 648;
   const gap = 22;
