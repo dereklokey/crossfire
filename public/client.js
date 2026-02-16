@@ -798,6 +798,13 @@ function drawHUD(data) {
     ctx.fillText(String(value), x - 8, y + h - 2);
   }
 
+  function drawBarMax(x, y, w, h, max, color = '#88a9bc') {
+    ctx.fillStyle = color;
+    ctx.font = '600 12px "Space Grotesk", "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(String(max), x + w + 8, y + h - 1);
+  }
+
   function drawReloadAlert(centerX, y, player, tint) {
     if (player.mag !== 0 || player.reloading) return;
     const pulse = 0.45 + 0.55 * Math.abs(Math.sin(Date.now() / 120));
@@ -910,7 +917,7 @@ function drawHUD(data) {
   const barW = 220;
   const barH = 14;
   const leftX = 34;
-  const rightX = 1200 - barW - 24;
+  const rightX = 1200 - barW - 34;
   const topY = 648;
   const gap = 22;
   const p1 = data.players[0];
@@ -920,11 +927,21 @@ function drawHUD(data) {
   drawBar(leftX, topY + gap, barW, barH, p1.bin, BIN_MAX, '#6ac6ec');
   drawBarValue(leftX, topY, barH, p1.mag);
   drawBarValue(leftX, topY + gap, barH, p1.bin);
+  drawBarMax(leftX, topY, barW, barH, MAG_MAX);
+  drawBarMax(leftX, topY + gap, barW, barH, BIN_MAX);
 
   drawBar(rightX, topY, barW, barH, p2.mag, MAG_MAX, getMagColor(p2.mag));
   drawBar(rightX, topY + gap, barW, barH, p2.bin, BIN_MAX, '#ef9575');
   drawBarValue(rightX, topY, barH, p2.mag);
   drawBarValue(rightX, topY + gap, barH, p2.bin);
+  drawBarMax(rightX, topY, barW, barH, MAG_MAX);
+  drawBarMax(rightX, topY + gap, barW, barH, BIN_MAX);
+
+  ctx.fillStyle = '#8fb2c6';
+  ctx.font = '600 12px "Space Grotesk", "Trebuchet MS", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Loaded Ammo', 600, topY + barH - 1);
+  ctx.fillText('Reload Ammo', 600, topY + gap + barH - 1);
 
   drawReloadAlert(leftX + barW / 2, topY - 8, p1, '#ffd36a');
   drawReloadAlert(rightX + barW / 2, topY - 8, p2, '#ffd36a');
