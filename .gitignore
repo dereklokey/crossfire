@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build/deploy artifacts
+deploy.zip
+
+# Local env files
+.env
+.env.*

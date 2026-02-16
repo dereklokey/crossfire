@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crossfire</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="panel" id="setupPanel">
+      <h1>Crossfire</h1>
+      <p class="sub">Shoot center pieces into your opponent's goal line.</p>
+
+      <label>Mode</label>
+      <select id="modeSelect">
+        <option value="single">Single Player (vs AI)</option>
+        <option value="host">Multiplayer (Host)</option>
+        <option value="join">Multiplayer (Join)</option>
+      </select>
+
+      <div id="pieceBlock">
+        <label>Pieces</label>
+        <select id="pieceSelect">
+          <option value="3">3</option>
+          <option value="5" selected>5</option>
+          <option value="7">7</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
+
+      <div id="aiBlock">
+        <label>AI Difficulty (single player)</label>
+        <select id="aiSelect">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+
+      <div class="row row-single" id="createBlock">
+        <button id="createBtn">Create Match</button>
+      </div>
+
+      <div id="joinBlock">
+        <label>Join Room ID</label>
+        <input id="joinInput" maxlength="16" placeholder="Paste room code" />
+        <div class="row row-single">
+          <button id="joinBtn">Join Match</button>
+        </div>
+      </div>
+
+      <label>Current Room ID</label>
+      <input id="roomInput" readonly placeholder="No active room" />
+      <div class="row row-single">
+        <button id="copyRoomBtn">Copy Room ID</button>
+      </div>
+
+      <div class="row">
+        <button id="startBtn" disabled>Start Match</button>
+        <button id="rematchBtn" disabled>Rematch</button>
+      </div>
+
+      <div class="status" id="statusText">Idle.</div>
+
+      <div class="help">
+        <div><strong>Controls</strong></div>
+        <div>Shoot: hold <code>Left Mouse</code></div>
+        <div>Reload: <code>Space</code></div>
+        <div>Aim: move cursor over canvas</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <canvas id="game" width="1200" height="700"></canvas>
+      <div class="overlay hidden" id="overlay"></div>
+    </main>
+  </div>
+
+  <script src="/client.js"></script>
+</body>
+</html>

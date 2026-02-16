@@ -1,0 +1,153 @@
+:root {
+  --bg0: #0a1016;
+  --bg1: #142535;
+  --panel: #0e1a24;
+  --line: #2f5168;
+  --ink: #d8e9f4;
+  --muted: #9fb5c6;
+  --accent: #f06d4f;
+  --accent2: #68b8d8;
+  --goalA: #7bd6ff;
+  --goalB: #ffaf8f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(1200px 500px at 50% 0%, #1b3246 0%, var(--bg0) 60%);
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
+}
+
+.panel {
+  border-right: 1px solid #294559;
+  background: linear-gradient(180deg, #102231 0%, var(--panel) 100%);
+  padding: 18px;
+}
+
+h1 {
+  margin: 4px 0 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sub {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+label {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+select,
+input,
+button {
+  width: 100%;
+  border: 1px solid #355870;
+  background: #122736;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+button {
+  cursor: pointer;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #1b4159 0%, #173446 100%);
+}
+
+button:hover {
+  border-color: #63a2c6;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.row-single {
+  grid-template-columns: 1fr;
+}
+
+.hidden-ui {
+  display: none;
+}
+
+.status {
+  margin-top: 12px;
+  border: 1px solid #31566d;
+  background: #112635;
+  border-radius: 8px;
+  min-height: 48px;
+  padding: 10px;
+  font-size: 13px;
+  color: #c7d8e5;
+}
+
+.help {
+  margin-top: 14px;
+  border-top: 1px solid #27465b;
+  padding-top: 12px;
+  color: #bdd0de;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.main {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  position: relative;
+}
+
+canvas {
+  width: min(100%, 1300px);
+  height: auto;
+  border: 2px solid #33556c;
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, #122332 0%, #0f1d2a 100%);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f9fbfd;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+}
+
+.hidden {
+  display: none;
+}

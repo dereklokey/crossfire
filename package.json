@@ -1,0 +1,9 @@
+{
+  "name": "crossfire",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Crossfire web game",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
