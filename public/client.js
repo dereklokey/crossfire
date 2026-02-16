@@ -740,7 +740,7 @@ function drawScoreFlares(board) {
     const pulse = 1 - t;
     const cx = flare.side === 0 ? board.goalRightX - 90 : board.goalLeftX + 90;
     const cy = board.height / 2;
-    const base = flare.side === 0 ? '#ffb08e' : '#74d9ff';
+    const base = flare.side === 0 ? '#74d9ff' : '#ffb08e';
 
     ctx.save();
     ctx.globalAlpha = 0.32 * pulse;
