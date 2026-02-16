@@ -810,14 +810,102 @@ function drawHUD(data) {
     ctx.restore();
   }
 
-  ctx.fillStyle = '#cfe2ef';
-  ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(`P1 Score: ${data.players[0].score}`, 18, 32);
-  ctx.fillText(`P2 Score: ${data.players[1].score}`, 1010, 32);
+  function roundedRectPath(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.arcTo(x + w, y, x + w, y + rr, rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.arcTo(x + w, y + h, x + w - rr, y + h, rr);
+    ctx.lineTo(x + rr, y + h);
+    ctx.arcTo(x, y + h, x, y + h - rr, rr);
+    ctx.lineTo(x, y + rr);
+    ctx.arcTo(x, y, x + rr, y, rr);
+    ctx.closePath();
+  }
 
+  function drawScoreCard(x, y, w, h, label, score, accent) {
+    roundedRectPath(x, y, w, h, 11);
+    const bg = ctx.createLinearGradient(x, y, x, y + h);
+    bg.addColorStop(0, 'rgba(16, 33, 47, 0.94)');
+    bg.addColorStop(1, 'rgba(12, 24, 35, 0.94)');
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(126, 174, 204, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = accent;
+    ctx.fillRect(x + 1.5, y + 1.5, 4, h - 3);
+
+    ctx.fillStyle = '#8fb3c8';
+    ctx.font = '600 11px "Space Grotesk", "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, x + 13, y + 13);
+
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '700 24px "Space Grotesk", "Trebuchet MS", sans-serif';
+    ctx.fillText(String(score), x + 13, y + h - 8);
+  }
+
+  function getCenterBadgeText() {
+    if (data.state === 'countdown') {
+      return {
+        top: 'MATCH STARTS',
+        bottom: String(Math.max(1, Math.ceil((data.countdownMs || 0) / 1000))),
+      };
+    }
+    if (data.state === 'running') {
+      return {
+        top: data.mode === 'network' ? 'LIVE MATCH' : 'SINGLE PLAYER',
+        bottom: data.mode === 'network' ? `ROOM ${data.roomId}` : 'CROSSFIRE',
+      };
+    }
+    if (data.state === 'lobby') {
+      return {
+        top: 'IN LOBBY',
+        bottom: data.mode === 'network' ? `ROOM ${data.roomId}` : 'READY TO START',
+      };
+    }
+    if (data.state === 'finished') {
+      const winnerLabel = typeof data.winner === 'number' ? `PLAYER ${data.winner + 1} WINS` : 'MATCH COMPLETE';
+      return { top: 'FINAL', bottom: winnerLabel };
+    }
+    return { top: 'CROSSFIRE', bottom: '' };
+  }
+
+  // Top match banner.
+  roundedRectPath(280, 8, 640, 46, 14);
+  const topGrad = ctx.createLinearGradient(280, 8, 280, 44);
+  topGrad.addColorStop(0, 'rgba(21, 45, 62, 0.7)');
+  topGrad.addColorStop(1, 'rgba(15, 32, 45, 0.7)');
+  ctx.fillStyle = topGrad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(130, 188, 221, 0.24)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  drawScoreCard(18, 10, 180, 44, 'PLAYER 1', data.players[0].score, '#6ac6ec');
+  drawScoreCard(1002, 10, 180, 44, 'PLAYER 2', data.players[1].score, '#ef9575');
+
+  roundedRectPath(492, 10, 216, 44, 10);
+  const midGrad = ctx.createLinearGradient(520, 10, 520, 42);
+  midGrad.addColorStop(0, 'rgba(28, 57, 76, 0.95)');
+  midGrad.addColorStop(1, 'rgba(19, 40, 55, 0.95)');
+  ctx.fillStyle = midGrad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(131, 190, 223, 0.28)';
+  ctx.stroke();
+
+  const badge = getCenterBadgeText();
+  ctx.fillStyle = '#8eb2c7';
+  ctx.font = '600 10px "Space Grotesk", "Trebuchet MS", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`Majority Wins: ${data.piecesNeeded}`, 600, 32);
+  ctx.fillText(badge.top, 600, 28);
+  ctx.fillStyle = '#e7f5ff';
+  ctx.font = '700 15px "Space Grotesk", "Trebuchet MS", sans-serif';
+  ctx.fillText(badge.bottom, 600, 46);
 
   const barW = 220;
   const barH = 14;
