@@ -336,7 +336,15 @@ function projectileHitsPiece(shot, piece) {
 
   const tangentX = -ny;
   const tangentY = nx;
-  const hitOffset = Math.abs((shot.x - piece.x) * tangentX + (shot.y - piece.y) * tangentY);
+  // Measure off-center impact from shot travel direction against piece center.
+  const shotSpeed = Math.hypot(shot.vx, shot.vy) || 1;
+  const dirX = shot.vx / shotSpeed;
+  const dirY = shot.vy / shotSpeed;
+  const lineNormalX = -dirY;
+  const lineNormalY = dirX;
+  const centerFromShotX = piece.x - shot.x;
+  const centerFromShotY = piece.y - shot.y;
+  const hitOffset = Math.abs(centerFromShotX * lineNormalX + centerFromShotY * lineNormalY);
   const centerFactor = clamp(1 - hitOffset / piece.radius, 0, 1);
 
   // Heavy pieces mostly respond to center-mass shots.
@@ -348,7 +356,7 @@ function projectileHitsPiece(shot, piece) {
   piece.vy += (ny * impulse) / piece.mass;
 
   const tangential = shot.vx * tangentX + shot.vy * tangentY;
-  piece.spin += (tangential / piece.mass) * (1 - centerFactor) * 0.02;
+  piece.spin += (tangential / piece.mass) * (1 - centerFactor) * 0.05;
 
   // Reflect and damp the ammo pellet so ammo can keep circulating.
   const bounce = 0.35;
