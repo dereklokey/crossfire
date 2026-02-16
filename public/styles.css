@@ -132,6 +132,31 @@ button:disabled {
   color: #d1e3ef;
 }
 
+.room-search-results {
+  margin-top: 10px;
+  border: 1px solid #315f79;
+  background: rgba(15, 38, 55, 0.65);
+  border-radius: 10px;
+  min-height: 44px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  font-size: 12px;
+  color: #c7dbe8;
+}
+
+.room-item-btn {
+  margin-top: 6px;
+  text-align: left;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.room-item-btn:first-child {
+  margin-top: 0;
+}
+
 .help {
   margin-top: 14px;
   border-top: 1px solid #2b566f;

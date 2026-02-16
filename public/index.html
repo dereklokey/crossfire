@@ -48,6 +48,10 @@
         <div class="row row-single">
           <button id="joinBtn">Join Match</button>
         </div>
+        <div class="row row-single">
+          <button id="searchRoomsBtn">Search Open Rooms</button>
+        </div>
+        <div id="roomSearchResults" class="room-search-results">No room search yet.</div>
       </div>
 
       <div id="roomBlock">
@@ -58,9 +62,12 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="row" id="hostActionRow">
         <button id="startBtn" disabled>Start Match</button>
         <button id="rematchBtn" disabled>Rematch</button>
+      </div>
+      <div class="row row-single hidden-ui" id="readyBlock">
+        <button id="readyBtn" disabled>Ready</button>
       </div>
 
       <div class="status" id="statusText">Idle.</div>

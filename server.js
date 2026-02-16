@@ -117,6 +117,7 @@ function defaultPlayer(side) {
     isAI: false,
     score: 0,
     lastShotAt: 0,
+    ready: false,
   };
 }
 
@@ -157,6 +158,7 @@ function resetPlayerForMatch(player) {
   player.controls.desiredAngle = null;
   player.score = 0;
   player.lastShotAt = 0;
+  player.ready = false;
 }
 
 function resetMatch(room, toLobby = false) {
@@ -185,6 +187,7 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
   if (mode === 'single') {
     players[1].connected = true;
     players[1].isAI = true;
+    players[1].ready = true;
   }
 
   const room = {
@@ -198,7 +201,7 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
     piecesNeeded: Math.floor(pieceCount / 2) + 1,
     state: 'lobby',
     startedAt: Date.now(),
-    countdownMs: 1800,
+    countdownMs: 5000,
     players,
     projectiles: [],
     pieces: createPieces(pieceCount),
@@ -485,8 +488,11 @@ function roomSnapshot(room, forPlayer) {
     pieceCount: room.pieceCount,
     piecesNeeded: room.piecesNeeded,
     countdownMs: room.state === 'countdown' ? Math.max(0, room.countdownMs - (Date.now() - room.startedAt)) : 0,
-    hostCanStart: forPlayer.side === 0 && room.state === 'lobby' && (room.mode === 'single' || bothConnected),
+    hostCanStart: forPlayer.side === 0
+      && room.state === 'lobby'
+      && (room.mode === 'single' || (bothConnected && room.players[1].ready)),
     hostCanRematch: forPlayer.side === 0 && room.state === 'finished',
+    joinerCanReady: room.mode === 'network' && forPlayer.side === 1 && room.state === 'lobby' && room.players[1].connected,
     me: forPlayer.side,
     players: room.players.map((p) => ({
       side: p.side,
@@ -498,6 +504,7 @@ function roomSnapshot(room, forPlayer) {
       score: p.score,
       connected: p.connected,
       isAI: p.isAI,
+      ready: p.ready,
     })),
     projectiles: room.projectiles.map((s) => ({ x: s.x, y: s.y, r: s.radius, owner: s.owner })),
     pieces: room.pieces.map((p) => ({
@@ -679,6 +686,20 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = url.pathname;
 
+    if (req.method === 'GET' && pathname === '/api/rooms') {
+      const openRooms = Array.from(rooms.values())
+        .filter((room) => room.mode === 'network' && room.state === 'lobby' && !room.players[1].connected)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 25)
+        .map((room) => ({
+          roomId: room.id,
+          pieceCount: room.pieceCount,
+          createdAt: room.createdAt,
+        }));
+      json(res, 200, { rooms: openRooms });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/create') {
       const body = await parseBody(req);
       const mode = body.mode === 'single' ? 'single' : 'network';
@@ -705,6 +726,7 @@ const server = http.createServer(async (req, res) => {
       if (p1.connected) return badRequest(res, 'Room already full');
       p1.connected = true;
       p1.isAI = false;
+      p1.ready = false;
       room.updatedAt = Date.now();
 
       json(res, 200, {
@@ -742,6 +764,23 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && pathname === '/api/ready') {
+      const body = await parseBody(req);
+      const room = rooms.get(String(body.roomId || '').trim());
+      if (!room) return badRequest(res, 'Room not found');
+      if (room.mode !== 'network') return badRequest(res, 'Ready is for multiplayer only');
+      if (room.state !== 'lobby') return badRequest(res, 'Can only change ready state in lobby');
+      const player = verifyPlayer(room, body.token);
+      if (!player) return badRequest(res, 'Invalid token');
+      if (player.side !== 1) return badRequest(res, 'Only joining player can toggle ready');
+
+      player.ready = Boolean(body.ready);
+      player.connected = true;
+      room.updatedAt = Date.now();
+      json(res, 200, { ok: true, ready: player.ready });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/start') {
       const body = await parseBody(req);
       const room = rooms.get(String(body.roomId || '').trim());
@@ -753,8 +792,13 @@ const server = http.createServer(async (req, res) => {
       if (room.mode === 'network' && !room.players.every((p) => p.connected)) {
         return badRequest(res, 'Waiting for opponent');
       }
+      if (room.mode === 'network' && !room.players[1].ready) {
+        return badRequest(res, 'Waiting for opponent to ready up');
+      }
 
       room.state = 'countdown';
+      room.players[0].ready = false;
+      room.players[1].ready = false;
       room.startedAt = Date.now();
       room.lastTickAt = Date.now();
       room.updatedAt = Date.now();

@@ -11,9 +11,14 @@ const pieceSelect = document.getElementById('pieceSelect');
 const aiSelect = document.getElementById('aiSelect');
 const createBtn = document.getElementById('createBtn');
 const joinBtn = document.getElementById('joinBtn');
+const hostActionRow = document.getElementById('hostActionRow');
 const startBtn = document.getElementById('startBtn');
 const rematchBtn = document.getElementById('rematchBtn');
+const readyBlock = document.getElementById('readyBlock');
+const readyBtn = document.getElementById('readyBtn');
 const copyRoomBtn = document.getElementById('copyRoomBtn');
+const searchRoomsBtn = document.getElementById('searchRoomsBtn');
+const roomSearchResults = document.getElementById('roomSearchResults');
 const joinInput = document.getElementById('joinInput');
 const roomInput = document.getElementById('roomInput');
 const statusText = document.getElementById('statusText');
@@ -37,6 +42,37 @@ const scoreFlares = [];
 
 function setStatus(msg) {
   statusText.textContent = msg;
+}
+
+function renderRoomSearchResults(rooms) {
+  roomSearchResults.innerHTML = '';
+  if (!rooms || rooms.length === 0) {
+    roomSearchResults.textContent = 'No open rooms found. Ask a host to create one.';
+    return;
+  }
+  for (const room of rooms) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'room-item-btn';
+    const ageSec = Math.max(0, Math.floor((Date.now() - room.createdAt) / 1000));
+    btn.textContent = `${room.roomId} • ${room.pieceCount} pieces • ${ageSec}s ago`;
+    btn.addEventListener('click', () => {
+      joinMatch(room.roomId);
+    });
+    roomSearchResults.appendChild(btn);
+  }
+}
+
+async function searchOpenRooms() {
+  try {
+    roomSearchResults.textContent = 'Searching open rooms...';
+    const res = await fetch('/api/rooms', { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Room search failed');
+    renderRoomSearchResults(data.rooms || []);
+  } catch (err) {
+    roomSearchResults.textContent = `Room search failed: ${err.message}`;
+  }
 }
 
 function trackScoreFlares(data) {
@@ -74,16 +110,34 @@ function renderSetupMode() {
   roomBlock.classList.toggle('hidden-ui', isSingle);
 
   createBtn.textContent = isSingle ? 'Create Single Player Match' : 'Create Multiplayer Room';
+  if (isJoin) {
+    searchOpenRooms();
+  }
 }
 
 function updateActionButtons(state) {
   if (!state) {
+    hostActionRow.classList.remove('hidden-ui');
+    readyBlock.classList.add('hidden-ui');
     startBtn.disabled = true;
     rematchBtn.disabled = true;
+    readyBtn.disabled = true;
     return;
   }
+
+  const isJoinerMultiplayer = state.mode === 'network' && state.me === 1;
+  hostActionRow.classList.toggle('hidden-ui', isJoinerMultiplayer);
+  readyBlock.classList.toggle('hidden-ui', !isJoinerMultiplayer);
+
   startBtn.disabled = !state.hostCanStart;
   rematchBtn.disabled = !state.hostCanRematch;
+  if (isJoinerMultiplayer) {
+    const myReady = Boolean(state.players[state.me].ready);
+    readyBtn.textContent = myReady ? 'Unready' : 'Ready';
+    readyBtn.disabled = !state.joinerCanReady;
+  } else {
+    readyBtn.disabled = true;
+  }
 }
 
 function setSessionLocked(locked) {
@@ -92,6 +146,7 @@ function setSessionLocked(locked) {
   aiSelect.disabled = locked;
   createBtn.disabled = locked;
   joinBtn.disabled = locked;
+  searchRoomsBtn.disabled = locked;
   joinInput.disabled = locked;
   if (locked && document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
@@ -142,9 +197,9 @@ async function createMatch() {
   }
 }
 
-async function joinMatch() {
+async function joinMatch(roomIdOverride = null) {
   try {
-    const roomId = joinInput.value.trim();
+    const roomId = String(roomIdOverride || joinInput.value || '').trim();
     if (!roomId) {
       setStatus('Enter room ID first.');
       return;
@@ -198,6 +253,25 @@ async function rematch() {
     }
   } catch (err) {
     setStatus(`Rematch failed: ${err.message}`);
+  }
+}
+
+async function toggleReady() {
+  if (!session.roomId || !session.token || !session.state) {
+    setStatus('Join a room first.');
+    return;
+  }
+  try {
+    const me = session.state.players[session.state.me];
+    const targetReady = !Boolean(me.ready);
+    const data = await postJSON('/api/ready', {
+      roomId: session.roomId,
+      token: session.token,
+      ready: targetReady,
+    });
+    setStatus(data.ready ? 'Ready set. Waiting for host.' : 'Ready cleared.');
+  } catch (err) {
+    setStatus(`Ready failed: ${err.message}`);
   }
 }
 
@@ -282,7 +356,9 @@ createBtn.addEventListener('click', createMatch);
 joinBtn.addEventListener('click', joinMatch);
 startBtn.addEventListener('click', startMatch);
 rematchBtn.addEventListener('click', rematch);
+readyBtn.addEventListener('click', toggleReady);
 copyRoomBtn.addEventListener('click', copyRoomId);
+searchRoomsBtn.addEventListener('click', searchOpenRooms);
 modeSelect.addEventListener('change', () => {
   if (!modeSelect.disabled) renderSetupMode();
 });
@@ -330,10 +406,15 @@ async function pollStateTick() {
       if (data.mode === 'single') {
         setStatus(`Single-player ready. Press Start Match.`);
       } else if (data.me === 0) {
-        const ready = data.players[1].connected ? 'Opponent connected. Press Start Match.' : 'Waiting for opponent to join.';
-        setStatus(`Room ${data.roomId} | Host | ${ready}`);
+        const p2 = data.players[1];
+        let hostMsg = 'Waiting for opponent to join.';
+        if (p2.connected && !p2.ready) hostMsg = 'Opponent connected. Waiting for ready.';
+        if (p2.connected && p2.ready) hostMsg = 'Opponent is ready. Press Start Match.';
+        setStatus(`Room ${data.roomId} | Host | ${hostMsg}`);
       } else {
-        setStatus(`Room ${data.roomId} | Joined as P2 | Waiting for host to start match.`);
+        const meReady = data.players[data.me].ready;
+        const joinMsg = meReady ? 'Ready. Waiting for host to start.' : 'Press Ready when you are set.';
+        setStatus(`Room ${data.roomId} | Joined as P2 | ${joinMsg}`);
       }
     } else {
       setStatus(
@@ -346,7 +427,11 @@ async function pollStateTick() {
       if (data.mode === 'single') {
         overlay.textContent = 'Press Start Match';
       } else {
-        overlay.textContent = data.me === 0 ? 'Press Start Match' : 'Waiting For Host';
+        if (data.me === 0) {
+          overlay.textContent = data.players[1].ready ? 'Opponent Ready' : 'Waiting For Ready';
+        } else {
+          overlay.textContent = data.players[data.me].ready ? 'Ready - Waiting For Host' : 'Press Ready';
+        }
       }
     } else if (data.state === 'countdown') {
       overlay.classList.remove('hidden');
