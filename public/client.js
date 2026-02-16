@@ -32,9 +32,33 @@ const controls = {
   desiredAngle: null,
 };
 let reloadQueued = 0;
+let lastScores = null;
+const scoreFlares = [];
 
 function setStatus(msg) {
   statusText.textContent = msg;
+}
+
+function trackScoreFlares(data) {
+  if (!data || !data.players || data.players.length < 2) return;
+  const current = [data.players[0].score, data.players[1].score];
+  if (!lastScores) {
+    lastScores = current;
+    return;
+  }
+
+  for (let side = 0; side < 2; side++) {
+    const delta = current[side] - lastScores[side];
+    if (delta > 0) {
+      for (let i = 0; i < delta; i++) {
+        scoreFlares.push({
+          side,
+          startedAt: Date.now() + i * 70,
+        });
+      }
+    }
+  }
+  lastScores = current;
 }
 
 function renderSetupMode() {
@@ -104,6 +128,8 @@ async function createMatch() {
     session.token = data.token;
     session.side = data.side;
     roomInput.value = data.roomId;
+    lastScores = null;
+    scoreFlares.length = 0;
     setSessionLocked(true);
 
     if (mode === 'network') {
@@ -129,6 +155,8 @@ async function joinMatch() {
     session.token = data.token;
     session.side = data.side;
     roomInput.value = data.roomId;
+    lastScores = null;
+    scoreFlares.length = 0;
     joinInput.value = '';
     setSessionLocked(true);
     setStatus(`Joined room ${data.roomId} as Player ${data.side + 1}.`);
@@ -292,6 +320,7 @@ async function pollStateTick() {
     if (!res.ok) throw new Error(data.error || 'State poll failed');
 
     session.state = data;
+    trackScoreFlares(data);
     updateActionButtons(data);
     render(data);
 
@@ -606,6 +635,52 @@ function drawProjectiles(projectiles) {
   }
 }
 
+function drawScoreFlares(board) {
+  if (!scoreFlares.length) return;
+  const now = Date.now();
+  const durationMs = 1150;
+  const kept = [];
+
+  for (const flare of scoreFlares) {
+    const age = now - flare.startedAt;
+    if (age < 0) {
+      kept.push(flare);
+      continue;
+    }
+    if (age > durationMs) continue;
+    kept.push(flare);
+
+    const t = age / durationMs;
+    const easeOut = 1 - Math.pow(1 - t, 3);
+    const pulse = 1 - t;
+    const cx = flare.side === 0 ? board.goalRightX - 90 : board.goalLeftX + 90;
+    const cy = board.height / 2;
+    const base = flare.side === 0 ? '#ffb08e' : '#74d9ff';
+
+    ctx.save();
+    ctx.globalAlpha = 0.32 * pulse;
+    ctx.strokeStyle = base;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 26 + easeOut * 115, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.22 * pulse;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 16 + easeOut * 72, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.95 * pulse;
+    ctx.fillStyle = '#f2fbff';
+    ctx.font = '700 30px "Space Grotesk", "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('SCORE!', cx, cy - 18 - easeOut * 24);
+    ctx.restore();
+  }
+  scoreFlares.length = 0;
+  scoreFlares.push(...kept);
+}
+
 function drawHUD(data) {
   const MAG_MAX = 20;
   const BIN_MAX = 50;
@@ -696,6 +771,7 @@ function render(data) {
   drawProjectiles(data.projectiles);
   drawGun(0, data.players[0].gunAngle, data.players[0]);
   drawGun(1, data.players[1].gunAngle, data.players[1]);
+  drawScoreFlares(board);
   drawHUD(data);
 }
 
