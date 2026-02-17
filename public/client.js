@@ -883,6 +883,89 @@ function drawBoard(board) {
 
   drawGoalLines(board);
 
+  // Sports-style field markings.
+  const cy = board.height / 2;
+  ctx.strokeStyle = 'rgba(220, 245, 228, 0.34)';
+  ctx.lineWidth = 2;
+
+  // Center diamonds.
+  const cx = board.width / 2;
+  const diamondOuter = 78;
+  const diamondInner = 16;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - diamondOuter);
+  ctx.lineTo(cx + diamondOuter, cy);
+  ctx.lineTo(cx, cy + diamondOuter);
+  ctx.lineTo(cx - diamondOuter, cy);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - diamondInner);
+  ctx.lineTo(cx + diamondInner, cy);
+  ctx.lineTo(cx, cy + diamondInner);
+  ctx.lineTo(cx - diamondInner, cy);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Midline mini triangles from top/bottom boundaries pointing inward.
+  const edgeTriHalf = 34;
+  const edgeTriDepth = 54;
+  const edgeTriOuterHalf = 60;
+  const edgeTriOuterDepth = 92;
+
+  ctx.beginPath();
+  ctx.moveTo(board.width / 2 - edgeTriOuterHalf, board.top);
+  ctx.lineTo(board.width / 2, board.top + edgeTriOuterDepth);
+  ctx.lineTo(board.width / 2 + edgeTriOuterHalf, board.top);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(board.width / 2 - edgeTriHalf, board.top);
+  ctx.lineTo(board.width / 2, board.top + edgeTriDepth);
+  ctx.lineTo(board.width / 2 + edgeTriHalf, board.top);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(board.width / 2 - edgeTriOuterHalf, board.bottom);
+  ctx.lineTo(board.width / 2, board.bottom - edgeTriOuterDepth);
+  ctx.lineTo(board.width / 2 + edgeTriOuterHalf, board.bottom);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(board.width / 2 - edgeTriHalf, board.bottom);
+  ctx.lineTo(board.width / 2, board.bottom - edgeTriDepth);
+  ctx.lineTo(board.width / 2 + edgeTriHalf, board.bottom);
+  ctx.stroke();
+
+  // Side triangle markings.
+  const triLong = 168;
+  const triWide = 280;
+  const triInnerLong = 98;
+  const triInnerWide = 160;
+  ctx.beginPath();
+  ctx.moveTo(board.goalLeftX, cy - triWide / 2);
+  ctx.lineTo(board.goalLeftX + triLong, cy);
+  ctx.lineTo(board.goalLeftX, cy + triWide / 2);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(board.goalLeftX, cy - triInnerWide / 2);
+  ctx.lineTo(board.goalLeftX + triInnerLong, cy);
+  ctx.lineTo(board.goalLeftX, cy + triInnerWide / 2);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(board.goalRightX, cy - triWide / 2);
+  ctx.lineTo(board.goalRightX - triLong, cy);
+  ctx.lineTo(board.goalRightX, cy + triWide / 2);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(board.goalRightX, cy - triInnerWide / 2);
+  ctx.lineTo(board.goalRightX - triInnerLong, cy);
+  ctx.lineTo(board.goalRightX, cy + triInnerWide / 2);
+  ctx.closePath();
+  ctx.stroke();
+
   ctx.strokeStyle = 'rgba(224, 247, 232, 0.55)';
   ctx.lineWidth = 1;
   ctx.setLineDash([7, 7]);
