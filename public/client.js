@@ -184,7 +184,7 @@ function pickRandom(items) {
 function queueGunBubble(side, text, opts = {}) {
   const now = Date.now();
   const minGapMs = Number(opts.minGapMs) || 1400;
-  const durationMs = Number(opts.durationMs) || 1600;
+  const durationMs = Number(opts.durationMs) || 2500;
   const key = String(opts.key || `${side}:${text}`);
   const keyCooldownMs = Number(opts.keyCooldownMs) || 3200;
 
