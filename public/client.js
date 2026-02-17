@@ -16,6 +16,8 @@ const startBtn = document.getElementById('startBtn');
 const rematchBtn = document.getElementById('rematchBtn');
 const readyBlock = document.getElementById('readyBlock');
 const readyBtn = document.getElementById('readyBtn');
+const resignBlock = document.getElementById('resignBlock');
+const resignBtn = document.getElementById('resignBtn');
 const leaveBtn = document.getElementById('leaveBtn');
 const copyRoomBtn = document.getElementById('copyRoomBtn');
 const searchRoomsBtn = document.getElementById('searchRoomsBtn');
@@ -342,9 +344,11 @@ function updateActionButtons(state) {
   if (!state) {
     hostActionRow.classList.remove('hidden-ui');
     readyBlock.classList.add('hidden-ui');
+    resignBlock.classList.add('hidden-ui');
     startBtn.disabled = true;
     rematchBtn.disabled = true;
     readyBtn.disabled = true;
+    resignBtn.disabled = true;
     leaveBtn.disabled = true;
     startBtn.textContent = 'Start Match';
     chatInput.disabled = true;
@@ -353,19 +357,32 @@ function updateActionButtons(state) {
   }
 
   const isJoinerMultiplayer = state.mode === 'network' && state.me === 1;
-  hostActionRow.classList.toggle('hidden-ui', isJoinerMultiplayer);
-  readyBlock.classList.toggle('hidden-ui', !isJoinerMultiplayer);
-
-  const waitingForJoiner = state.mode === 'network' && state.me === 0 && state.state === 'lobby' && !state.players[1].connected;
-  startBtn.textContent = waitingForJoiner ? 'Practice' : 'Start Match';
-  startBtn.disabled = !state.hostCanStart;
-  rematchBtn.disabled = !state.hostCanRematch;
-  if (isJoinerMultiplayer) {
-    const myReady = Boolean(state.players[state.me].ready);
-    readyBtn.textContent = myReady ? 'Unready' : 'Ready';
-    readyBtn.disabled = !state.joinerCanReady;
-  } else {
+  const inMatch = state.state === 'running' || state.state === 'countdown';
+  if (inMatch) {
+    hostActionRow.classList.add('hidden-ui');
+    readyBlock.classList.add('hidden-ui');
+    resignBlock.classList.remove('hidden-ui');
+    startBtn.disabled = true;
+    rematchBtn.disabled = true;
     readyBtn.disabled = true;
+    resignBtn.disabled = false;
+  } else {
+    hostActionRow.classList.toggle('hidden-ui', isJoinerMultiplayer);
+    readyBlock.classList.toggle('hidden-ui', !isJoinerMultiplayer);
+    resignBlock.classList.add('hidden-ui');
+    resignBtn.disabled = true;
+
+    const waitingForJoiner = state.mode === 'network' && state.me === 0 && state.state === 'lobby' && !state.players[1].connected;
+    startBtn.textContent = waitingForJoiner ? 'Practice' : 'Start Match';
+    startBtn.disabled = !state.hostCanStart;
+    rematchBtn.disabled = !state.hostCanRematch;
+    if (isJoinerMultiplayer) {
+      const myReady = Boolean(state.players[state.me].ready);
+      readyBtn.textContent = myReady ? 'Unready' : 'Ready';
+      readyBtn.disabled = !state.joinerCanReady;
+    } else {
+      readyBtn.disabled = true;
+    }
   }
   leaveBtn.disabled = false;
   const canChat = state.state === 'lobby' || state.state === 'finished';
@@ -373,6 +390,22 @@ function updateActionButtons(state) {
   chatSendBtn.disabled = !canChat;
   if (!canChat && document.activeElement === chatInput) {
     chatInput.blur();
+  }
+}
+
+async function resignMatch() {
+  if (!session.roomId || !session.token) {
+    setStatus('Create or join a room first.');
+    return;
+  }
+  try {
+    await postJSON('/api/resign', {
+      roomId: session.roomId,
+      token: session.token,
+    });
+    setStatus('Resigned.');
+  } catch (err) {
+    setStatus(`Resign failed: ${err.message}`);
   }
 }
 
@@ -618,6 +651,7 @@ joinBtn.addEventListener('click', joinMatch);
 startBtn.addEventListener('click', startMatch);
 rematchBtn.addEventListener('click', rematch);
 readyBtn.addEventListener('click', toggleReady);
+resignBtn.addEventListener('click', resignMatch);
 leaveBtn.addEventListener('click', leaveRoom);
 copyRoomBtn.addEventListener('click', copyRoomId);
 searchRoomsBtn.addEventListener('click', searchOpenRooms);

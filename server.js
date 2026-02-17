@@ -992,6 +992,60 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && pathname === '/api/resign') {
+      const body = await parseBody(req);
+      const room = rooms.get(String(body.roomId || '').trim());
+      if (!room) return badRequest(res, 'Room not found');
+      const player = verifyPlayer(room, body.token);
+      if (!player) return badRequest(res, 'Invalid token');
+      player.lastSeenAt = Date.now();
+
+      if (room.warmupAi) {
+        resetMatch(room, true);
+        addRoomMessage(room, 'System', 'Practice round resigned. Back to lobby.');
+        room.updatedAt = Date.now();
+        json(res, 200, { ok: true, winner: null });
+        return;
+      }
+
+      const activeMatch = room.state === 'running' || room.state === 'countdown';
+      if (!activeMatch) {
+        if (room.mode === 'network' && player.side === 1) {
+          player.connected = false;
+          player.ready = false;
+          player.controls.aimDir = 0;
+          player.controls.shooting = false;
+          player.controls.desiredAngle = null;
+          if (room.players[0].connected) {
+            startWarmupAiRound(room, true);
+          }
+          room.updatedAt = Date.now();
+          addRoomMessage(room, 'System', 'Player 2 resigned and left the room.');
+          json(res, 200, { ok: true, winner: null, left: true });
+          return;
+        }
+        return badRequest(res, 'Can only resign during an active match');
+      }
+
+      const winner = player.side === 0 ? 1 : 0;
+      room.state = 'finished';
+      room.winner = winner;
+      room.warmupAi = false;
+      room.resultAnnounced = true;
+      room.players[0].ready = false;
+      room.players[1].ready = false;
+      room.players[0].controls.shooting = false;
+      room.players[1].controls.shooting = false;
+      addRoomMessage(
+        room,
+        'System',
+        `Player ${player.side + 1} resigned. Final score: P1 ${room.players[0].score} - P2 ${room.players[1].score}. Player ${winner + 1} wins.`
+      );
+      room.updatedAt = Date.now();
+      json(res, 200, { ok: true, winner });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/start') {
       const body = await parseBody(req);
       const room = rooms.get(String(body.roomId || '').trim());
