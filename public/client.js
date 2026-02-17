@@ -27,6 +27,14 @@ const chatLog = document.getElementById('chatLog');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
 const overlay = document.getElementById('overlay');
+const IDLE_BOARD = {
+  width: canvas.width,
+  height: canvas.height,
+  goalLeftX: 130,
+  goalRightX: canvas.width - 130,
+  top: 60,
+  bottom: 640,
+};
 
 let session = {
   roomId: null,
@@ -114,6 +122,7 @@ function resetToLobbyState(message = 'Left room.') {
   updateActionButtons(null);
   overlay.classList.add('hidden');
   renderSetupMode();
+  renderIdleCanvas();
   setStatus(message);
   searchOpenRooms();
 }
@@ -1171,15 +1180,40 @@ function render(data) {
   drawHUD(data);
 }
 
+function renderIdleCanvas() {
+  const idle = {
+    board: IDLE_BOARD,
+    state: 'lobby',
+    mode: 'single',
+    roomId: '',
+    players: [
+      { score: 0, mag: 0, bin: 0, reloading: false },
+      { score: 0, mag: 0, bin: 0, reloading: false },
+    ],
+    countdownMs: 0,
+    runElapsedMs: 0,
+  };
+
+  drawBoard(idle.board);
+  drawHUD(idle);
+
+  ctx.fillStyle = 'rgba(7, 18, 27, 0.52)';
+  ctx.fillRect(330, 315, 540, 70);
+  ctx.strokeStyle = 'rgba(158, 203, 229, 0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(330, 315, 540, 70);
+
+  ctx.fillStyle = '#d8ebf9';
+  ctx.font = '700 24px "Space Grotesk", "Trebuchet MS", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Create or join a match to begin.', canvas.width / 2, 360);
+}
+
 setInterval(sendInputTick, 50);
 setInterval(pollStateTick, 50);
 setInterval(searchOpenRooms, 5000);
 
-ctx.fillStyle = '#8aa4b8';
-ctx.font = 'bold 22px Trebuchet MS';
-ctx.textAlign = 'center';
-ctx.fillText('Create or join a match to begin.', canvas.width / 2, canvas.height / 2);
-
 renderSetupMode();
 updateActionButtons(null);
+renderIdleCanvas();
 searchOpenRooms();
