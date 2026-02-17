@@ -280,15 +280,12 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
     chat: [],
   };
 
-  if (room.mode === 'network') {
-    startWarmupAiRound(room, false);
-  }
   addRoomMessage(
     room,
     'System',
     mode === 'single'
       ? 'Single-player room created.'
-      : 'Multiplayer room created. Warmup vs AI is active until Player 2 joins.'
+      : 'Multiplayer room created. Press Practice to warm up vs AI while waiting for Player 2.'
   );
 
   rooms.set(roomId, room);
@@ -561,6 +558,7 @@ function processControls(room, player, dtSec, now) {
 
 function roomSnapshot(room, forPlayer) {
   const bothConnected = room.players.every((p) => p.connected);
+  const joinerConnected = room.mode === 'network' && room.players[1].connected;
   return {
     roomId: room.id,
     board: BOARD,
@@ -573,7 +571,11 @@ function roomSnapshot(room, forPlayer) {
     runElapsedMs: room.state === 'running' && room.runStartedAt ? Math.max(0, Date.now() - room.runStartedAt) : 0,
     hostCanStart: forPlayer.side === 0
       && room.state === 'lobby'
-      && (room.mode === 'single' || (bothConnected && room.players[1].ready)),
+      && (
+        room.mode === 'single'
+        || !joinerConnected
+        || (bothConnected && room.players[1].ready)
+      ),
     hostCanRematch: forPlayer.side === 0 && room.state === 'finished',
     joinerCanReady: room.mode === 'network' && forPlayer.side === 1 && room.state === 'lobby' && room.players[1].connected,
     warmupAi: Boolean(room.warmupAi),
@@ -729,7 +731,8 @@ function tickRoom(room, now) {
   for (const side of [0, 1]) {
     if (room.players[side].score >= room.piecesNeeded) {
       if (room.warmupAi) {
-        startWarmupAiRound(room, false);
+        resetMatch(room, true);
+        addRoomMessage(room, 'System', 'Practice round ended. Press Practice to start another.');
         room.updatedAt = now;
         return;
       }
@@ -991,8 +994,11 @@ const server = http.createServer(async (req, res) => {
       player.lastSeenAt = Date.now();
       if (player.side !== 0) return badRequest(res, 'Only host can start');
       if (room.state !== 'lobby') return badRequest(res, 'Match is already in progress');
-      if (room.mode === 'network' && !room.players.every((p) => p.connected)) {
-        return badRequest(res, 'Waiting for opponent');
+      if (room.mode === 'network' && !room.players[1].connected) {
+        startWarmupAiRound(room, true);
+        room.updatedAt = Date.now();
+        json(res, 200, { ok: true, mode: 'practice' });
+        return;
       }
       if (room.mode === 'network' && !room.players[1].ready) {
         return badRequest(res, 'Waiting for opponent to ready up');

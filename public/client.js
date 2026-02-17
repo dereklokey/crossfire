@@ -201,6 +201,7 @@ function updateActionButtons(state) {
     rematchBtn.disabled = true;
     readyBtn.disabled = true;
     leaveBtn.disabled = true;
+    startBtn.textContent = 'Start Match';
     chatInput.disabled = true;
     chatSendBtn.disabled = true;
     return;
@@ -210,6 +211,8 @@ function updateActionButtons(state) {
   hostActionRow.classList.toggle('hidden-ui', isJoinerMultiplayer);
   readyBlock.classList.toggle('hidden-ui', !isJoinerMultiplayer);
 
+  const waitingForJoiner = state.mode === 'network' && state.me === 0 && state.state === 'lobby' && !state.players[1].connected;
+  startBtn.textContent = waitingForJoiner ? 'Practice' : 'Start Match';
   startBtn.disabled = !state.hostCanStart;
   rematchBtn.disabled = !state.hostCanRematch;
   if (isJoinerMultiplayer) {
@@ -319,7 +322,11 @@ async function startMatch() {
       roomId: session.roomId,
       token: session.token,
     });
-    setStatus('Starting match...');
+    if (session.state && session.state.mode === 'network' && !session.state.players[1].connected) {
+      setStatus('Starting practice vs AI...');
+    } else {
+      setStatus('Starting match...');
+    }
   } catch (err) {
     setStatus(`Start failed: ${err.message}`);
   }
@@ -524,7 +531,7 @@ async function pollStateTick() {
         setStatus(`Single-player ready. Press Start Match.`);
       } else if (data.me === 0) {
         const p2 = data.players[1];
-        let hostMsg = 'Waiting for opponent to join.';
+        let hostMsg = 'Waiting for opponent to join. Press Practice to warm up vs AI.';
         if (p2.connected && !p2.ready) hostMsg = 'Opponent connected. Waiting for ready.';
         if (p2.connected && p2.ready) hostMsg = 'Opponent is ready. Press Start Match.';
         setStatus(`Room ${data.roomId} | Host | ${hostMsg}`);
@@ -551,7 +558,11 @@ async function pollStateTick() {
         overlay.textContent = 'Press Start Match';
       } else {
         if (data.me === 0) {
-          overlay.textContent = data.players[1].ready ? 'Opponent Ready' : 'Waiting For Ready';
+          if (!data.players[1].connected) {
+            overlay.textContent = 'Press Practice';
+          } else {
+            overlay.textContent = data.players[1].ready ? 'Opponent Ready' : 'Waiting For Ready';
+          }
         } else {
           overlay.textContent = data.players[data.me].ready ? 'Ready - Waiting For Host' : 'Press Ready';
         }
