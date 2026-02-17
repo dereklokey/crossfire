@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
   --bg0: #080f17;
@@ -200,24 +200,37 @@ button:disabled {
 
 .game-title {
   margin: 2px 0 10px;
-  font-family: "Bebas Neue", "Space Grotesk", sans-serif;
   font-size: 62px;
-  letter-spacing: 0.14em;
-  font-weight: 400;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #fff7d2 0%, #ffd26a 20%, #ff9728 52%, #ff4c1f 76%, #a9130f 100%);
+  background: linear-gradient(
+    90deg,
+    #1f97db 0%,
+    #3fbfff 20%,
+    #76dcff 38%,
+    #ffd084 56%,
+    #ff9a36 84%,
+    #ef9575 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow:
-    0 1px 0 rgba(255, 250, 224, 0.38),
-    0 2px 0 rgba(100, 28, 8, 0.7),
-    0 0 14px rgba(255, 140, 47, 0.42),
-    0 0 28px rgba(255, 86, 28, 0.35),
+    0 1px 0 rgba(232, 244, 252, 0.28),
+    0 2px 0 rgba(18, 36, 50, 0.62),
+    0 0 12px rgba(102, 200, 247, 0.28),
+    0 0 22px rgba(255, 130, 52, 0.2),
     0 14px 30px rgba(0, 0, 0, 0.42);
   position: relative;
   padding: 0 30px;
-  animation: titleFlame 1.8s ease-in-out infinite;
+  animation: none;
+  transform-origin: center;
+}
+
+body.title-style-ops .game-title {
+  font-family: "Black Ops One", "Space Grotesk", sans-serif;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  transform: skewX(-7deg);
 }
 
 .game-title::before,
@@ -246,27 +259,6 @@ button:disabled {
     radial-gradient(circle, rgba(255, 181, 128, 0.96) 0 58%, rgba(255, 181, 128, 0) 60%) left center / 28px 28px no-repeat,
     linear-gradient(90deg, rgba(240, 133, 90, 0.58) 0%, rgba(240, 133, 90, 0.58) 12%, rgba(240, 133, 90, 0.26) 56%, rgba(240, 133, 90, 0) 100%) right center / 252px 11px no-repeat;
   box-shadow: none;
-}
-
-@keyframes titleFlame {
-  0%, 100% {
-    filter: saturate(1) brightness(1);
-    text-shadow:
-      0 1px 0 rgba(255, 250, 224, 0.35),
-      0 2px 0 rgba(100, 28, 8, 0.7),
-      0 0 12px rgba(255, 146, 52, 0.38),
-      0 0 22px rgba(255, 92, 34, 0.3),
-      0 14px 30px rgba(0, 0, 0, 0.42);
-  }
-  50% {
-    filter: saturate(1.15) brightness(1.07);
-    text-shadow:
-      0 1px 0 rgba(255, 251, 232, 0.42),
-      0 2px 0 rgba(100, 28, 8, 0.7),
-      0 0 18px rgba(255, 164, 67, 0.55),
-      0 0 32px rgba(255, 97, 40, 0.48),
-      0 14px 30px rgba(0, 0, 0, 0.42);
-  }
 }
 
 .canvas-wrap {
