@@ -81,6 +81,7 @@ async function sendChatMessage() {
     setStatus('Join a room before sending chat.');
     return;
   }
+  if (chatInput.disabled) return;
   const message = String(chatInput.value || '').trim();
   if (!message) return;
   try {
@@ -218,8 +219,12 @@ function updateActionButtons(state) {
     readyBtn.disabled = true;
   }
   leaveBtn.disabled = false;
-  chatInput.disabled = false;
-  chatSendBtn.disabled = false;
+  const canChat = state.state === 'lobby' || state.state === 'finished';
+  chatInput.disabled = !canChat;
+  chatSendBtn.disabled = !canChat;
+  if (!canChat && document.activeElement === chatInput) {
+    chatInput.blur();
+  }
 }
 
 function setSessionLocked(locked) {
