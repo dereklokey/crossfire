@@ -206,12 +206,34 @@ function resetMatch(room, toLobby = false) {
   room.pieces = createPieces(room.pieceCount);
   room.winner = null;
   room.players.forEach(resetPlayerForMatch);
+  room.warmupAi = false;
   room.startedAt = Date.now();
   room.runStartedAt = 0;
   room.lastTickAt = Date.now();
   room.state = toLobby ? 'lobby' : 'countdown';
   room.resultAnnounced = false;
   addRoomMessage(room, 'System', 'Match reset.');
+}
+
+function startWarmupAiRound(room, announce = false) {
+  room.projectiles = [];
+  room.pieces = createPieces(room.pieceCount);
+  room.winner = null;
+  room.players.forEach(resetPlayerForMatch);
+  room.players[1].isAI = true;
+  room.players[1].connected = false;
+  room.players[1].lastSeenAt = 0;
+  room.players[1].lastInputAt = 0;
+  room.players[1].ready = false;
+  room.warmupAi = true;
+  room.startedAt = Date.now();
+  room.runStartedAt = Date.now();
+  room.lastTickAt = Date.now();
+  room.state = 'running';
+  room.resultAnnounced = false;
+  if (announce) {
+    addRoomMessage(room, 'System', 'Warmup vs AI started while waiting for Player 2.');
+  }
 }
 
 function createRoom({ mode, pieceSetting, aiDifficulty }) {
@@ -254,10 +276,20 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
     runStartedAt: 0,
     lastTickAt: Date.now(),
     resultAnnounced: false,
+    warmupAi: false,
     chat: [],
   };
 
-  addRoomMessage(room, 'System', mode === 'single' ? 'Single-player room created.' : 'Multiplayer room created.');
+  if (room.mode === 'network') {
+    startWarmupAiRound(room, false);
+  }
+  addRoomMessage(
+    room,
+    'System',
+    mode === 'single'
+      ? 'Single-player room created.'
+      : 'Multiplayer room created. Warmup vs AI is active until Player 2 joins.'
+  );
 
   rooms.set(roomId, room);
   return room;
@@ -544,6 +576,7 @@ function roomSnapshot(room, forPlayer) {
       && (room.mode === 'single' || (bothConnected && room.players[1].ready)),
     hostCanRematch: forPlayer.side === 0 && room.state === 'finished',
     joinerCanReady: room.mode === 'network' && forPlayer.side === 1 && room.state === 'lobby' && room.players[1].connected,
+    warmupAi: Boolean(room.warmupAi),
     me: forPlayer.side,
     players: room.players.map((p) => ({
       side: p.side,
@@ -695,6 +728,11 @@ function tickRoom(room, now) {
 
   for (const side of [0, 1]) {
     if (room.players[side].score >= room.piecesNeeded) {
+      if (room.warmupAi) {
+        startWarmupAiRound(room, false);
+        room.updatedAt = now;
+        return;
+      }
       room.state = 'finished';
       room.winner = side;
     }
@@ -775,7 +813,9 @@ const server = http.createServer(async (req, res) => {
       const now = Date.now();
       const openRooms = Array.from(rooms.values())
         .filter((room) => {
-          if (room.mode !== 'network' || room.state !== 'lobby') return false;
+          if (room.mode !== 'network') return false;
+          if (room.warmupAi) return true;
+          if (room.state !== 'lobby') return false;
           const joinerPresent = room.players[1].connected && (now - room.players[1].lastSeenAt <= PRESENCE_ACTIVE_MS);
           return !joinerPresent;
         })
@@ -827,6 +867,12 @@ const server = http.createServer(async (req, res) => {
       p1.isAI = false;
       p1.ready = false;
       p1.lastSeenAt = Date.now();
+      p1.lastInputAt = Date.now();
+      if (room.warmupAi) {
+        resetMatch(room, true);
+        room.warmupAi = false;
+        addRoomMessage(room, 'System', 'Warmup ended. Lobby ready for multiplayer start.');
+      }
       room.updatedAt = Date.now();
       addRoomMessage(room, 'System', 'Player 2 joined the room.');
 
@@ -922,10 +968,8 @@ const server = http.createServer(async (req, res) => {
       player.controls.shooting = false;
       player.controls.desiredAngle = null;
 
-      // If the match was in progress, host gets the win and can rematch.
-      if (room.mode === 'network' && (room.state === 'running' || room.state === 'countdown')) {
-        room.state = 'finished';
-        room.winner = 0;
+      if (room.mode === 'network' && room.players[0].connected) {
+        startWarmupAiRound(room, true);
       }
 
       room.updatedAt = Date.now();

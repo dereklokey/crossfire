@@ -533,9 +533,15 @@ async function pollStateTick() {
         setStatus(`Room ${data.roomId} | Joined as P2 | ${joinMsg}`);
       }
     } else {
-      setStatus(
-        `Room ${data.roomId} | You: P${data.me + 1} | Score ${me.score}-${them.score} | Mag ${me.mag}/20 | Bin ${me.bin}`
-      );
+      if (data.warmupAi && data.mode === 'network') {
+        setStatus(
+          `Room ${data.roomId} | Warmup vs AI (waiting for joiner) | Score ${me.score}-${them.score}`
+        );
+      } else {
+        setStatus(
+          `Room ${data.roomId} | You: P${data.me + 1} | Score ${me.score}-${them.score} | Mag ${me.mag}/20 | Bin ${me.bin}`
+        );
+      }
     }
 
     if (data.state === 'lobby') {
