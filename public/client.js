@@ -52,6 +52,10 @@ let reloadQueued = 0;
 let lastScores = null;
 const scoreFlares = [];
 let lastChatSignature = '';
+const gunBubbles = [];
+const bubbleCooldownBySide = [0, 0];
+const bubbleCooldownByKey = new Map();
+let lastChatterSnapshot = null;
 
 function setStatus(msg) {
   // Status panel removed from UI; keep hook for non-visual state updates.
@@ -111,6 +115,11 @@ function resetToLobbyState(message = 'Left room.') {
   session.state = null;
   lastScores = null;
   scoreFlares.length = 0;
+  gunBubbles.length = 0;
+  bubbleCooldownBySide[0] = 0;
+  bubbleCooldownBySide[1] = 0;
+  bubbleCooldownByKey.clear();
+  lastChatterSnapshot = null;
   reloadQueued = 0;
   lastChatSignature = '';
   controls.shooting = false;
@@ -166,6 +175,130 @@ async function searchOpenRooms() {
     roomSearchResults.textContent = `Room search failed: ${err.message}`;
     onlineCount.textContent = '?';
   }
+}
+
+function pickRandom(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function queueGunBubble(side, text, opts = {}) {
+  const now = Date.now();
+  const minGapMs = Number(opts.minGapMs) || 1400;
+  const durationMs = Number(opts.durationMs) || 1600;
+  const key = String(opts.key || `${side}:${text}`);
+  const keyCooldownMs = Number(opts.keyCooldownMs) || 3200;
+
+  if (now < bubbleCooldownBySide[side]) return;
+  const keyUntil = bubbleCooldownByKey.get(key) || 0;
+  if (now < keyUntil) return;
+
+  bubbleCooldownBySide[side] = now + minGapMs;
+  bubbleCooldownByKey.set(key, now + keyCooldownMs);
+  gunBubbles.push({
+    side,
+    text,
+    startedAt: now,
+    durationMs,
+  });
+  if (gunBubbles.length > 8) gunBubbles.splice(0, gunBubbles.length - 8);
+}
+
+function updateGunChatter(data) {
+  if (!data || !data.players || data.players.length < 2) return;
+  const snap = {
+    roomId: data.roomId,
+    state: data.state,
+    scores: [data.players[0].score, data.players[1].score],
+    mags: [data.players[0].mag, data.players[1].mag],
+    bins: [data.players[0].bin, data.players[1].bin],
+    reloading: [Boolean(data.players[0].reloading), Boolean(data.players[1].reloading)],
+  };
+
+  if (!lastChatterSnapshot || lastChatterSnapshot.roomId !== snap.roomId) {
+    lastChatterSnapshot = snap;
+    return;
+  }
+
+  if (snap.state !== 'running') {
+    lastChatterSnapshot = snap;
+    return;
+  }
+
+  for (let side = 0; side < 2; side++) {
+    const other = 1 - side;
+    const prevScore = lastChatterSnapshot.scores[side];
+    const nowScore = snap.scores[side];
+    if (nowScore > prevScore) {
+      queueGunBubble(side, pickRandom([
+        'GOAL!!!',
+        'Yes!',
+        'Nailed it!',
+        'Boom!',
+        'Right on!',
+        'Got it!',
+        'What a shot!',
+      ]), {
+        key: `score-${side}`,
+        minGapMs: 900,
+        keyCooldownMs: 1500,
+      });
+      queueGunBubble(other, pickRandom([
+        'Nooooo!',
+        'Dang!',
+        'Not good!',
+        'Ugh!',
+        'That hurts!',
+        'No way!',
+        'Not again!',
+      ]), {
+        key: `concede-${other}`,
+        minGapMs: 1200,
+      });
+      const prevGap = prevScore - lastChatterSnapshot.scores[other];
+      if (prevGap <= -2) {
+        queueGunBubble(side, pickRandom([
+          'Comeback time!',
+          "I'm back in it!",
+          "Not done yet!",
+          'Momentum shift!',
+          'Still alive!',
+        ]), {
+          key: `comeback-${side}`,
+          minGapMs: 2200,
+          keyCooldownMs: 4500,
+        });
+      }
+    }
+  }
+
+  for (let side = 0; side < 2; side++) {
+    const prevMag = lastChatterSnapshot.mags[side];
+    const mag = snap.mags[side];
+    const bin = snap.bins[side];
+    const reloadingStarted = !lastChatterSnapshot.reloading[side] && snap.reloading[side];
+
+    if (prevMag > 0 && mag === 0) {
+      const text = bin > 0
+        ? pickRandom(['Need a reload!', 'Reloading soon!', 'Mag empty!', 'Time to top up!'])
+        : pickRandom(["I'm out!", 'No ammo!', 'Dry fire!', 'Completely empty!']);
+      queueGunBubble(side, text, {
+        key: `empty-${side}`,
+        minGapMs: 1800,
+      });
+    } else if (reloadingStarted && mag === 0 && bin > 0) {
+      queueGunBubble(side, pickRandom([
+        'Reloading!',
+        'Cover me!',
+        'Swapping mags!',
+        'Loading up!',
+      ]), {
+        key: `reload-${side}`,
+        minGapMs: 1800,
+      });
+    }
+  }
+
+  lastChatterSnapshot = snap;
 }
 
 function trackScoreFlares(data) {
@@ -533,6 +666,7 @@ async function pollStateTick() {
     session.state = data;
     renderChat(data.chat);
     trackScoreFlares(data);
+    updateGunChatter(data);
     updateActionButtons(data);
     render(data);
 
@@ -928,6 +1062,74 @@ function drawProjectiles(projectiles) {
   }
 }
 
+function drawGunBubbles() {
+  if (!gunBubbles.length) return;
+  const now = Date.now();
+  const kept = [];
+
+  for (const b of gunBubbles) {
+    const age = now - b.startedAt;
+    if (age < 0) {
+      kept.push(b);
+      continue;
+    }
+    if (age > b.durationMs) continue;
+    kept.push(b);
+
+    const t = age / b.durationMs;
+    const rise = t * 12;
+    const alpha = t < 0.15 ? t / 0.15 : (1 - t) / 0.85;
+    const x = b.side === 0 ? 105 : 1095;
+    const y = 286 - rise;
+    const text = b.text;
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.font = '700 13px "Space Grotesk", "Trebuchet MS", sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const padX = 10;
+    const w = textWidth + padX * 2;
+    const h = 28;
+    const left = b.side === 0 ? x : x - w;
+    const top = y - h;
+    const r = 9;
+
+    ctx.fillStyle = 'rgba(11, 25, 36, 0.9)';
+    ctx.strokeStyle = b.side === 0 ? 'rgba(116, 217, 255, 0.7)' : 'rgba(255, 176, 142, 0.7)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(left + r, top);
+    ctx.lineTo(left + w - r, top);
+    ctx.quadraticCurveTo(left + w, top, left + w, top + r);
+    ctx.lineTo(left + w, top + h - r);
+    ctx.quadraticCurveTo(left + w, top + h, left + w - r, top + h);
+    if (b.side === 0) {
+      ctx.lineTo(left + 18, top + h);
+      ctx.lineTo(left + 8, top + h + 8);
+      ctx.lineTo(left + 10, top + h - 1);
+    } else {
+      ctx.lineTo(left + w - 18, top + h);
+      ctx.lineTo(left + w - 8, top + h + 8);
+      ctx.lineTo(left + w - 10, top + h - 1);
+    }
+    ctx.lineTo(left + r, top + h);
+    ctx.quadraticCurveTo(left, top + h, left, top + h - r);
+    ctx.lineTo(left, top + r);
+    ctx.quadraticCurveTo(left, top, left + r, top);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#eef8ff';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, left + w / 2, top + 18);
+    ctx.restore();
+  }
+
+  gunBubbles.length = 0;
+  gunBubbles.push(...kept);
+}
+
 function drawScoreFlares(board) {
   if (!scoreFlares.length) return;
   const now = Date.now();
@@ -1176,6 +1378,7 @@ function render(data) {
   drawProjectiles(data.projectiles);
   drawGun(0, data.players[0].gunAngle, data.players[0]);
   drawGun(1, data.players[1].gunAngle, data.players[1]);
+  drawGunBubbles();
   drawScoreFlares(board);
   drawHUD(data);
 }
