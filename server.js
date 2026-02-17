@@ -592,7 +592,14 @@ function roomSnapshot(room, forPlayer) {
       isAI: p.isAI,
       ready: p.ready,
     })),
-    projectiles: room.projectiles.map((s) => ({ x: s.x, y: s.y, r: s.radius, owner: s.owner })),
+    projectiles: room.projectiles.map((s) => ({
+      x: s.x,
+      y: s.y,
+      r: s.radius,
+      owner: s.owner,
+      vx: s.vx,
+      vy: s.vy,
+    })),
     pieces: room.pieces.map((p) => ({
       id: p.id,
       x: p.x,

@@ -1055,6 +1055,29 @@ function drawGun(side, angle, playerState) {
 
 function drawProjectiles(projectiles) {
   for (const s of projectiles) {
+    const vx = Number(s.vx) || 0;
+    const vy = Number(s.vy) || 0;
+    const speed = Math.hypot(vx, vy);
+    if (speed > 380) {
+      const dirX = vx / speed;
+      const dirY = vy / speed;
+      const tailLen = Math.min(22, Math.max(8, speed * 0.02));
+      const grad = ctx.createLinearGradient(s.x, s.y, s.x - dirX * tailLen, s.y - dirY * tailLen);
+      if (s.owner === 0) {
+        grad.addColorStop(0, 'rgba(116, 217, 255, 0.8)');
+        grad.addColorStop(1, 'rgba(116, 217, 255, 0)');
+      } else {
+        grad.addColorStop(0, 'rgba(255, 176, 142, 0.8)');
+        grad.addColorStop(1, 'rgba(255, 176, 142, 0)');
+      }
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = Math.max(1.6, s.r * 1.1);
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - dirX * tailLen, s.y - dirY * tailLen);
+      ctx.stroke();
+    }
+
     ctx.fillStyle = s.owner === 0 ? '#74d9ff' : '#ffb08e';
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
