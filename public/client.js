@@ -120,11 +120,12 @@ function resetToLobbyState(message = 'Left room.') {
 
 function renderRoomSearchResults(rooms) {
   roomSearchResults.innerHTML = '';
-  if (!rooms || rooms.length === 0) {
+  const visibleRooms = (rooms || []).filter((room) => room.roomId !== session.roomId);
+  if (visibleRooms.length === 0) {
     roomSearchResults.textContent = 'No open rooms found. Ask a host to create one.';
     return;
   }
-  for (const room of rooms) {
+  for (const room of visibleRooms) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'room-item-btn';
@@ -565,6 +566,12 @@ async function pollStateTick() {
       overlay.classList.add('hidden');
     }
   } catch (err) {
+    if (err && typeof err.message === 'string') {
+      if (err.message.includes('Room not found') || err.message.includes('Invalid token')) {
+        resetToLobbyState('Room closed by host.');
+        return;
+      }
+    }
     setStatus(`Connection issue: ${err.message}`);
   }
 }

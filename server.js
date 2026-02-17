@@ -752,6 +752,10 @@ function tickRoom(room, now) {
 function maintenance(now) {
   for (const [id, room] of rooms.entries()) {
     tickRoom(room, now);
+    if (room.mode === 'network' && !room.players[0].connected) {
+      rooms.delete(id);
+      continue;
+    }
     if (now - room.updatedAt > ROOM_TIMEOUT_MS) {
       rooms.delete(id);
     }
