@@ -9,9 +9,6 @@
 <body>
   <div class="app-shell">
     <aside class="panel" id="setupPanel">
-      <h1>Crossfire</h1>
-      <p class="sub">Shoot center pieces into your opponent's goal line.</p>
-
       <label>Mode</label>
       <select id="modeSelect">
         <option value="single">Single Player (vs AI)</option>
@@ -48,11 +45,16 @@
         <div class="row row-single">
           <button id="joinBtn">Join Match</button>
         </div>
-        <div class="row row-single">
-          <button id="searchRoomsBtn">Search Open Rooms</button>
-        </div>
-        <div id="roomSearchResults" class="room-search-results">No room search yet.</div>
       </div>
+
+      <section class="room-live-panel" id="roomLivePanel">
+        <div class="room-live-head">
+          <div class="room-live-title">Live Multiplayer Rooms</div>
+          <button id="searchRoomsBtn" class="mini-btn">Refresh</button>
+        </div>
+        <div class="room-live-meta">Players online: <span id="onlineCount">0</span></div>
+        <div id="roomSearchResults" class="room-search-results">No room search yet.</div>
+      </section>
 
       <div id="roomBlock">
         <label>Current Room ID</label>
@@ -69,20 +71,32 @@
       <div class="row row-single hidden-ui" id="readyBlock">
         <button id="readyBtn" disabled>Ready</button>
       </div>
+      <div class="row row-single">
+        <button id="leaveBtn" disabled>Leave Room</button>
+      </div>
 
-      <div class="status" id="statusText">Idle.</div>
+      <section class="chat-panel" id="chatPanel">
+        <div class="chat-title">Room Chat</div>
+        <div class="chat-log" id="chatLog">Create or join a room to start chat.</div>
+        <div class="chat-input-row">
+          <input id="chatInput" maxlength="240" placeholder="Type a message..." />
+          <button id="chatSendBtn">Send</button>
+        </div>
+      </section>
+    </aside>
 
-      <div class="help">
+    <main class="main">
+      <h1 class="game-title">Crossfire</h1>
+      <div class="canvas-wrap">
+        <canvas id="game" width="1200" height="700"></canvas>
+        <div class="overlay hidden" id="overlay"></div>
+      </div>
+      <div class="board-controls">
         <div><strong>Controls</strong></div>
         <div>Shoot: hold <code>Left Mouse</code></div>
         <div>Reload: <code>Space</code></div>
         <div>Aim: move cursor over canvas</div>
       </div>
-    </aside>
-
-    <main class="main">
-      <canvas id="game" width="1200" height="700"></canvas>
-      <div class="overlay hidden" id="overlay"></div>
     </main>
   </div>
 

@@ -16,12 +16,16 @@ const startBtn = document.getElementById('startBtn');
 const rematchBtn = document.getElementById('rematchBtn');
 const readyBlock = document.getElementById('readyBlock');
 const readyBtn = document.getElementById('readyBtn');
+const leaveBtn = document.getElementById('leaveBtn');
 const copyRoomBtn = document.getElementById('copyRoomBtn');
 const searchRoomsBtn = document.getElementById('searchRoomsBtn');
+const onlineCount = document.getElementById('onlineCount');
 const roomSearchResults = document.getElementById('roomSearchResults');
 const joinInput = document.getElementById('joinInput');
 const roomInput = document.getElementById('roomInput');
-const statusText = document.getElementById('statusText');
+const chatLog = document.getElementById('chatLog');
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
 const overlay = document.getElementById('overlay');
 
 let session = {
@@ -39,9 +43,78 @@ const controls = {
 let reloadQueued = 0;
 let lastScores = null;
 const scoreFlares = [];
+let lastChatSignature = '';
 
 function setStatus(msg) {
-  statusText.textContent = msg;
+  // Status panel removed from UI; keep hook for non-visual state updates.
+  void msg;
+}
+
+function renderChat(messages) {
+  if (!messages || messages.length === 0) {
+    chatLog.textContent = 'No messages yet.';
+    lastChatSignature = '';
+    return;
+  }
+  const signature = `${messages.length}:${messages[messages.length - 1].id}`;
+  if (signature === lastChatSignature) return;
+  lastChatSignature = signature;
+
+  chatLog.innerHTML = '';
+  for (const m of messages) {
+    const row = document.createElement('div');
+    row.className = 'chat-message';
+    const sender = document.createElement('span');
+    sender.className = 'chat-sender';
+    sender.textContent = `${m.sender}:`;
+    const text = document.createElement('span');
+    text.textContent = m.text;
+    row.appendChild(sender);
+    row.appendChild(text);
+    chatLog.appendChild(row);
+  }
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+async function sendChatMessage() {
+  if (!session.roomId || !session.token) {
+    setStatus('Join a room before sending chat.');
+    return;
+  }
+  const message = String(chatInput.value || '').trim();
+  if (!message) return;
+  try {
+    await postJSON('/api/chat', {
+      roomId: session.roomId,
+      token: session.token,
+      message,
+    });
+    chatInput.value = '';
+  } catch (err) {
+    setStatus(`Chat failed: ${err.message}`);
+  }
+}
+
+function resetToLobbyState(message = 'Left room.') {
+  session.roomId = null;
+  session.token = null;
+  session.side = 0;
+  session.state = null;
+  lastScores = null;
+  scoreFlares.length = 0;
+  reloadQueued = 0;
+  lastChatSignature = '';
+  controls.shooting = false;
+  controls.desiredAngle = null;
+  roomInput.value = '';
+  chatLog.textContent = 'Create or join a room to start chat.';
+  chatInput.value = '';
+  setSessionLocked(false);
+  updateActionButtons(null);
+  overlay.classList.add('hidden');
+  renderSetupMode();
+  setStatus(message);
+  searchOpenRooms();
 }
 
 function renderRoomSearchResults(rooms) {
@@ -54,8 +127,12 @@ function renderRoomSearchResults(rooms) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'room-item-btn';
+    const alreadyInRoom = Boolean(session.roomId && session.token);
+    btn.disabled = alreadyInRoom;
     const ageSec = Math.max(0, Math.floor((Date.now() - room.createdAt) / 1000));
-    btn.textContent = `${room.roomId} • ${room.pieceCount} pieces • ${ageSec}s ago`;
+    btn.textContent = alreadyInRoom
+      ? `${room.roomId} • ${room.pieceCount} pieces • ${ageSec}s ago (leave current room to join)`
+      : `${room.roomId} • ${room.pieceCount} pieces • ${ageSec}s ago`;
     btn.addEventListener('click', () => {
       joinMatch(room.roomId);
     });
@@ -69,9 +146,11 @@ async function searchOpenRooms() {
     const res = await fetch('/api/rooms', { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Room search failed');
+    onlineCount.textContent = String(Number(data.onlinePlayers) || 0);
     renderRoomSearchResults(data.rooms || []);
   } catch (err) {
     roomSearchResults.textContent = `Room search failed: ${err.message}`;
+    onlineCount.textContent = '?';
   }
 }
 
@@ -110,9 +189,6 @@ function renderSetupMode() {
   roomBlock.classList.toggle('hidden-ui', isSingle);
 
   createBtn.textContent = isSingle ? 'Create Single Player Match' : 'Create Multiplayer Room';
-  if (isJoin) {
-    searchOpenRooms();
-  }
 }
 
 function updateActionButtons(state) {
@@ -122,6 +198,9 @@ function updateActionButtons(state) {
     startBtn.disabled = true;
     rematchBtn.disabled = true;
     readyBtn.disabled = true;
+    leaveBtn.disabled = true;
+    chatInput.disabled = true;
+    chatSendBtn.disabled = true;
     return;
   }
 
@@ -138,6 +217,9 @@ function updateActionButtons(state) {
   } else {
     readyBtn.disabled = true;
   }
+  leaveBtn.disabled = false;
+  chatInput.disabled = false;
+  chatSendBtn.disabled = false;
 }
 
 function setSessionLocked(locked) {
@@ -146,7 +228,6 @@ function setSessionLocked(locked) {
   aiSelect.disabled = locked;
   createBtn.disabled = locked;
   joinBtn.disabled = locked;
-  searchRoomsBtn.disabled = locked;
   joinInput.disabled = locked;
   if (locked && document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
@@ -192,6 +273,7 @@ async function createMatch() {
     } else {
       setStatus(`Single-player room ${data.roomId} ready. Difficulty: ${aiSelect.value}.`);
     }
+    searchOpenRooms();
   } catch (err) {
     setStatus(`Create failed: ${err.message}`);
   }
@@ -215,6 +297,7 @@ async function joinMatch(roomIdOverride = null) {
     joinInput.value = '';
     setSessionLocked(true);
     setStatus(`Joined room ${data.roomId} as Player ${data.side + 1}.`);
+    searchOpenRooms();
   } catch (err) {
     setStatus(`Join failed: ${err.message}`);
   }
@@ -275,6 +358,22 @@ async function toggleReady() {
   }
 }
 
+async function leaveRoom() {
+  if (!session.roomId || !session.token) {
+    resetToLobbyState('Not currently in a room.');
+    return;
+  }
+  try {
+    await postJSON('/api/leave', {
+      roomId: session.roomId,
+      token: session.token,
+    });
+    resetToLobbyState('Left room.');
+  } catch (err) {
+    setStatus(`Leave failed: ${err.message}`);
+  }
+}
+
 async function copyRoomId() {
   const roomId = (session.roomId || roomInput.value || '').trim();
   if (!roomId) {
@@ -322,6 +421,10 @@ async function copyRoomId() {
 }
 
 window.addEventListener('keydown', (e) => {
+  const target = e.target;
+  const isTypingTarget = target instanceof HTMLElement
+    && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+  if (isTypingTarget) return;
   if (e.code === 'Space') {
     reloadQueued += 1;
     e.preventDefault();
@@ -357,8 +460,16 @@ joinBtn.addEventListener('click', joinMatch);
 startBtn.addEventListener('click', startMatch);
 rematchBtn.addEventListener('click', rematch);
 readyBtn.addEventListener('click', toggleReady);
+leaveBtn.addEventListener('click', leaveRoom);
 copyRoomBtn.addEventListener('click', copyRoomId);
 searchRoomsBtn.addEventListener('click', searchOpenRooms);
+chatSendBtn.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
 modeSelect.addEventListener('change', () => {
   if (!modeSelect.disabled) renderSetupMode();
 });
@@ -389,13 +500,13 @@ async function pollStateTick() {
   if (!session.roomId || !session.token) return;
 
   try {
-    const res = await fetch(`/api/state?roomId=${encodeURIComponent(session.roomId)}&token=${encodeURIComponent(session.token)}`, {
-      cache: 'no-store',
+    const data = await postJSON('/api/state', {
+      roomId: session.roomId,
+      token: session.token,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'State poll failed');
 
     session.state = data;
+    renderChat(data.chat);
     trackScoreFlares(data);
     updateActionButtons(data);
     render(data);
@@ -857,6 +968,13 @@ function drawHUD(data) {
   }
 
   function getCenterBadgeText() {
+    const formatClock = (ms) => {
+      const totalSec = Math.floor((Number(ms) || 0) / 1000);
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    };
+
     if (data.state === 'countdown') {
       return {
         top: 'MATCH STARTS',
@@ -865,8 +983,8 @@ function drawHUD(data) {
     }
     if (data.state === 'running') {
       return {
-        top: data.mode === 'network' ? 'LIVE MATCH' : 'SINGLE PLAYER',
-        bottom: data.mode === 'network' ? `ROOM ${data.roomId}` : 'CROSSFIRE',
+        top: 'MATCH TIME',
+        bottom: formatClock(data.runElapsedMs),
       };
     }
     if (data.state === 'lobby') {
@@ -967,6 +1085,7 @@ function render(data) {
 
 setInterval(sendInputTick, 50);
 setInterval(pollStateTick, 50);
+setInterval(searchOpenRooms, 5000);
 
 ctx.fillStyle = '#8aa4b8';
 ctx.font = 'bold 22px Trebuchet MS';
@@ -974,3 +1093,5 @@ ctx.textAlign = 'center';
 ctx.fillText('Create or join a match to begin.', canvas.width / 2, canvas.height / 2);
 
 renderSetupMode();
+updateActionButtons(null);
+searchOpenRooms();

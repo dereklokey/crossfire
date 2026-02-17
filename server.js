@@ -27,6 +27,9 @@ const START_BIN_EACH = Math.floor((TOTAL_AMMO - START_MAG * 2) / 2);
 const RELOAD_MS = 700;
 const ROOM_TIMEOUT_MS = 1000 * 60 * 30;
 const INPUT_STALE_MS = 1000;
+const CHAT_MAX_MESSAGES = 120;
+const CHAT_MAX_CHARS = 240;
+const PRESENCE_ACTIVE_MS = 30000;
 
 const rooms = new Map();
 
@@ -34,9 +37,31 @@ function uid(len = 8) {
   return crypto.randomBytes(len).toString('hex');
 }
 
+function securityHeaders() {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data:",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '),
+  };
+}
+
 function json(res, code, data) {
   const body = JSON.stringify(data);
   res.writeHead(code, {
+    ...securityHeaders(),
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
     'Cache-Control': 'no-store',
@@ -113,6 +138,7 @@ function defaultPlayer(side) {
     shootCooldown: 0,
     token: uid(12),
     connected: false,
+    lastSeenAt: 0,
     lastInputAt: 0,
     isAI: false,
     score: 0,
@@ -146,6 +172,20 @@ function createPieces(pieceCount) {
   return Array.from({ length: pieceCount }, (_, i) => makePiece(i, pieceCount));
 }
 
+function addRoomMessage(room, sender, text) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return;
+  room.chat.push({
+    id: uid(6),
+    sender,
+    text: clean.slice(0, CHAT_MAX_CHARS),
+    ts: Date.now(),
+  });
+  if (room.chat.length > CHAT_MAX_MESSAGES) {
+    room.chat.splice(0, room.chat.length - CHAT_MAX_MESSAGES);
+  }
+}
+
 function resetPlayerForMatch(player) {
   player.gunAngle = player.side === 0 ? 0 : Math.PI;
   player.mag = START_MAG;
@@ -167,8 +207,11 @@ function resetMatch(room, toLobby = false) {
   room.winner = null;
   room.players.forEach(resetPlayerForMatch);
   room.startedAt = Date.now();
+  room.runStartedAt = 0;
   room.lastTickAt = Date.now();
   room.state = toLobby ? 'lobby' : 'countdown';
+  room.resultAnnounced = false;
+  addRoomMessage(room, 'System', 'Match reset.');
 }
 
 function createRoom({ mode, pieceSetting, aiDifficulty }) {
@@ -183,11 +226,13 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
   const roomId = uid(5);
   const players = [defaultPlayer(0), defaultPlayer(1)];
   players[0].connected = true;
+  players[0].lastSeenAt = Date.now();
 
   if (mode === 'single') {
     players[1].connected = true;
     players[1].isAI = true;
     players[1].ready = true;
+    players[1].lastSeenAt = Date.now();
   }
 
   const room = {
@@ -206,8 +251,13 @@ function createRoom({ mode, pieceSetting, aiDifficulty }) {
     projectiles: [],
     pieces: createPieces(pieceCount),
     winner: null,
+    runStartedAt: 0,
     lastTickAt: Date.now(),
+    resultAnnounced: false,
+    chat: [],
   };
+
+  addRoomMessage(room, 'System', mode === 'single' ? 'Single-player room created.' : 'Multiplayer room created.');
 
   rooms.set(roomId, room);
   return room;
@@ -488,6 +538,7 @@ function roomSnapshot(room, forPlayer) {
     pieceCount: room.pieceCount,
     piecesNeeded: room.piecesNeeded,
     countdownMs: room.state === 'countdown' ? Math.max(0, room.countdownMs - (Date.now() - room.startedAt)) : 0,
+    runElapsedMs: room.state === 'running' && room.runStartedAt ? Math.max(0, Date.now() - room.runStartedAt) : 0,
     hostCanStart: forPlayer.side === 0
       && room.state === 'lobby'
       && (room.mode === 'single' || (bothConnected && room.players[1].ready)),
@@ -516,10 +567,22 @@ function roomSnapshot(room, forPlayer) {
       shape: p.shape,
       scoredBy: p.scoredBy,
     })),
+    chat: room.chat,
   };
 }
 
 function tickRoom(room, now) {
+  for (const player of room.players) {
+    if (player.isAI) continue;
+    if (player.connected && now - player.lastSeenAt > PRESENCE_ACTIVE_MS) {
+      player.connected = false;
+      player.ready = false;
+      player.controls.shooting = false;
+      player.controls.aimDir = 0;
+      player.controls.desiredAngle = null;
+    }
+  }
+
   const dt = Math.min((now - room.lastTickAt) / 1000, 0.05);
   room.lastTickAt = now;
 
@@ -532,6 +595,7 @@ function tickRoom(room, now) {
   if (room.state === 'countdown') {
     if (now - room.startedAt >= room.countdownMs) {
       room.state = 'running';
+      room.runStartedAt = now;
     }
     return;
   }
@@ -636,6 +700,14 @@ function tickRoom(room, now) {
     }
   }
 
+  if (room.state === 'finished' && !room.resultAnnounced) {
+    const p1 = room.players[0].score;
+    const p2 = room.players[1].score;
+    const winnerLabel = room.winner === 0 ? 'Player 1' : 'Player 2';
+    addRoomMessage(room, 'System', `Final score: P1 ${p1} - P2 ${p2}. ${winnerLabel} wins.`);
+    room.resultAnnounced = true;
+  }
+
   room.updatedAt = now;
 }
 
@@ -652,15 +724,27 @@ function serveStatic(req, res, pathname) {
   const safePath = pathname === '/' ? '/index.html' : pathname;
   const filePath = path.join(PUBLIC_DIR, path.normalize(safePath));
   if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403);
-    res.end('Forbidden');
+    const body = 'Forbidden';
+    res.writeHead(403, {
+      ...securityHeaders(),
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Length': Buffer.byteLength(body),
+      'Cache-Control': 'no-store',
+    });
+    res.end(body);
     return;
   }
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      res.writeHead(404);
-      res.end('Not found');
+      const body = 'Not found';
+      res.writeHead(404, {
+        ...securityHeaders(),
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body),
+        'Cache-Control': 'no-store',
+      });
+      res.end(body);
       return;
     }
 
@@ -673,6 +757,7 @@ function serveStatic(req, res, pathname) {
     }[ext] || 'application/octet-stream';
 
     res.writeHead(200, {
+      ...securityHeaders(),
       'Content-Type': type,
       'Content-Length': data.length,
       'Cache-Control': 'no-store',
@@ -687,8 +772,13 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname;
 
     if (req.method === 'GET' && pathname === '/api/rooms') {
+      const now = Date.now();
       const openRooms = Array.from(rooms.values())
-        .filter((room) => room.mode === 'network' && room.state === 'lobby' && !room.players[1].connected)
+        .filter((room) => {
+          if (room.mode !== 'network' || room.state !== 'lobby') return false;
+          const joinerPresent = room.players[1].connected && (now - room.players[1].lastSeenAt <= PRESENCE_ACTIVE_MS);
+          return !joinerPresent;
+        })
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, 25)
         .map((room) => ({
@@ -696,7 +786,16 @@ const server = http.createServer(async (req, res) => {
           pieceCount: room.pieceCount,
           createdAt: room.createdAt,
         }));
-      json(res, 200, { rooms: openRooms });
+      let onlinePlayers = 0;
+      for (const room of rooms.values()) {
+        for (const p of room.players) {
+          if (p.isAI) continue;
+          if (p.connected && (now - p.lastSeenAt <= PRESENCE_ACTIVE_MS)) {
+            onlinePlayers += 1;
+          }
+        }
+      }
+      json(res, 200, { rooms: openRooms, onlinePlayers });
       return;
     }
 
@@ -727,7 +826,9 @@ const server = http.createServer(async (req, res) => {
       p1.connected = true;
       p1.isAI = false;
       p1.ready = false;
+      p1.lastSeenAt = Date.now();
       room.updatedAt = Date.now();
+      addRoomMessage(room, 'System', 'Player 2 joined the room.');
 
       json(res, 200, {
         roomId: room.id,
@@ -736,6 +837,22 @@ const server = http.createServer(async (req, res) => {
         pieceCount: room.pieceCount,
         piecesNeeded: room.piecesNeeded,
       });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/chat') {
+      const body = await parseBody(req);
+      const room = rooms.get(String(body.roomId || '').trim());
+      if (!room) return badRequest(res, 'Room not found');
+      const player = verifyPlayer(room, body.token);
+      if (!player) return badRequest(res, 'Invalid token');
+
+      const raw = String(body.message || '');
+      if (!raw.trim()) return badRequest(res, 'Message is empty');
+      const sender = player.isAI ? 'AI' : `P${player.side + 1}`;
+      addRoomMessage(room, sender, raw);
+      room.updatedAt = Date.now();
+      json(res, 200, { ok: true });
       return;
     }
 
@@ -757,6 +874,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       player.lastInputAt = Date.now();
+      player.lastSeenAt = Date.now();
       player.connected = true;
       room.updatedAt = Date.now();
 
@@ -775,9 +893,44 @@ const server = http.createServer(async (req, res) => {
       if (player.side !== 1) return badRequest(res, 'Only joining player can toggle ready');
 
       player.ready = Boolean(body.ready);
+      player.lastSeenAt = Date.now();
       player.connected = true;
       room.updatedAt = Date.now();
       json(res, 200, { ok: true, ready: player.ready });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/leave') {
+      const body = await parseBody(req);
+      const room = rooms.get(String(body.roomId || '').trim());
+      if (!room) return badRequest(res, 'Room not found');
+      const player = verifyPlayer(room, body.token);
+      if (!player) return badRequest(res, 'Invalid token');
+      player.lastSeenAt = Date.now();
+
+      // Host leaving ends the room.
+      if (player.side === 0) {
+        rooms.delete(room.id);
+        json(res, 200, { ok: true, deleted: true });
+        return;
+      }
+
+      // Joiner leaving frees the room slot and clears ready state.
+      player.connected = false;
+      player.ready = false;
+      player.controls.aimDir = 0;
+      player.controls.shooting = false;
+      player.controls.desiredAngle = null;
+
+      // If the match was in progress, host gets the win and can rematch.
+      if (room.mode === 'network' && (room.state === 'running' || room.state === 'countdown')) {
+        room.state = 'finished';
+        room.winner = 0;
+      }
+
+      room.updatedAt = Date.now();
+      addRoomMessage(room, 'System', 'Player 2 left the room.');
+      json(res, 200, { ok: true, deleted: false });
       return;
     }
 
@@ -787,6 +940,7 @@ const server = http.createServer(async (req, res) => {
       if (!room) return badRequest(res, 'Room not found');
       const player = verifyPlayer(room, body.token);
       if (!player) return badRequest(res, 'Invalid token');
+      player.lastSeenAt = Date.now();
       if (player.side !== 0) return badRequest(res, 'Only host can start');
       if (room.state !== 'lobby') return badRequest(res, 'Match is already in progress');
       if (room.mode === 'network' && !room.players.every((p) => p.connected)) {
@@ -800,6 +954,7 @@ const server = http.createServer(async (req, res) => {
       room.players[0].ready = false;
       room.players[1].ready = false;
       room.startedAt = Date.now();
+      room.runStartedAt = 0;
       room.lastTickAt = Date.now();
       room.updatedAt = Date.now();
 
@@ -813,6 +968,7 @@ const server = http.createServer(async (req, res) => {
       if (!room) return badRequest(res, 'Room not found');
       const player = verifyPlayer(room, body.token);
       if (!player) return badRequest(res, 'Invalid token');
+      player.lastSeenAt = Date.now();
       if (player.side !== 0) return badRequest(res, 'Only host can rematch');
       if (room.state !== 'finished') return badRequest(res, 'Match is not finished');
 
@@ -823,15 +979,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && pathname === '/api/state') {
-      const roomId = String(url.searchParams.get('roomId') || '').trim();
-      const token = String(url.searchParams.get('token') || '').trim();
+    if (req.method === 'POST' && pathname === '/api/state') {
+      const body = await parseBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const token = String(body.token || '').trim();
       const room = rooms.get(roomId);
       if (!room) return badRequest(res, 'Room not found');
       const player = verifyPlayer(room, token);
       if (!player) return badRequest(res, 'Invalid token');
 
       player.connected = true;
+      player.lastSeenAt = Date.now();
       room.updatedAt = Date.now();
 
       json(res, 200, roomSnapshot(room, player));

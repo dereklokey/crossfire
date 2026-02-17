@@ -50,12 +50,6 @@ h1 {
   font-size: 26px;
 }
 
-.sub {
-  margin: 0 0 18px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
 label {
   display: block;
   margin: 12px 0 7px;
@@ -145,6 +139,42 @@ button:disabled {
   color: #c7dbe8;
 }
 
+.room-live-panel {
+  margin-top: 12px;
+  border: 1px solid #315f79;
+  background: rgba(15, 38, 55, 0.7);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.room-live-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-live-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9db8c9;
+}
+
+.room-live-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #c7dbe8;
+}
+
+.mini-btn {
+  width: auto;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.03em;
+}
+
 .room-item-btn {
   margin-top: 6px;
   text-align: left;
@@ -157,24 +187,61 @@ button:disabled {
   margin-top: 0;
 }
 
-.help {
-  margin-top: 14px;
-  border-top: 1px solid #2b566f;
-  padding-top: 12px;
-  color: #bdd0de;
-  font-size: 12px;
-  line-height: 1.55;
+.room-item-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .main {
   display: grid;
   place-items: center;
   padding: 20px;
+}
+
+.game-title {
+  margin: 2px 0 10px;
+  font-size: 36px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #f4fbff 0%, #b9d8ea 55%, #84b3cd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1),
+    0 10px 24px rgba(0, 0, 0, 0.35);
   position: relative;
+  padding: 0 24px;
+}
+
+.game-title::before,
+.game-title::after {
+  content: "";
+  position: absolute;
+  top: 52%;
+  width: 180px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(132, 179, 205, 0), rgba(132, 179, 205, 0.6), rgba(132, 179, 205, 0));
+}
+
+.game-title::before {
+  right: 100%;
+  margin-right: 12px;
+}
+
+.game-title::after {
+  left: 100%;
+  margin-left: 12px;
+}
+
+.canvas-wrap {
+  position: relative;
+  width: min(100%, 1300px);
 }
 
 canvas {
-  width: min(100%, 1300px);
+  width: 100%;
   height: auto;
   border: 1px solid #3a6883;
   border-radius: 14px;
@@ -198,6 +265,71 @@ canvas {
   text-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
 }
 
+.chat-panel {
+  margin-top: 12px;
+  border: 1px solid #355f79;
+  background: rgba(13, 29, 42, 0.78);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.chat-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9db8c9;
+  margin-bottom: 8px;
+}
+
+.chat-log {
+  height: 140px;
+  overflow: auto;
+  border: 1px solid #2e5670;
+  background: rgba(9, 22, 32, 0.75);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 12px;
+  color: #d7e8f2;
+}
+
+.chat-message {
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.chat-message:last-child {
+  margin-bottom: 0;
+}
+
+.chat-sender {
+  color: #8fb5cb;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.chat-input-row {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: 8px;
+}
+
+.board-controls {
+  margin-top: 10px;
+  width: min(100%, 1300px);
+  border: 1px solid #355f79;
+  background: rgba(13, 29, 42, 0.66);
+  border-radius: 12px;
+  padding: 9px 12px;
+  color: #bdd0de;
+  font-size: 12px;
+  line-height: 1.5;
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  gap: 18px;
+  align-items: center;
+}
+
 .hidden {
   display: none;
 }
@@ -210,5 +342,25 @@ canvas {
   .panel {
     border-right: 0;
     border-bottom: 1px solid var(--line-soft);
+  }
+
+  .chat-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .game-title {
+    font-size: 28px;
+    letter-spacing: 0.07em;
+    padding: 0;
+  }
+
+  .game-title::before,
+  .game-title::after {
+    display: none;
+  }
+
+  .board-controls {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
