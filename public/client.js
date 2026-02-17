@@ -578,23 +578,37 @@ function drawGoalLines(board) {
 }
 
 function drawBoard(board) {
-  const grad = ctx.createLinearGradient(0, 0, 0, board.height);
-  grad.addColorStop(0, '#12283a');
-  grad.addColorStop(1, '#0c1a27');
-  ctx.fillStyle = grad;
+  // Keep non-playing bands dark.
+  const outerGrad = ctx.createLinearGradient(0, 0, 0, board.height);
+  outerGrad.addColorStop(0, '#12283a');
+  outerGrad.addColorStop(1, '#0c1a27');
+  ctx.fillStyle = outerGrad;
   ctx.fillRect(0, 0, board.width, board.height);
 
-  const sheen = ctx.createRadialGradient(board.width / 2, board.height / 2, 80, board.width / 2, board.height / 2, board.width * 0.6);
-  sheen.addColorStop(0, 'rgba(108, 168, 196, 0.14)');
-  sheen.addColorStop(1, 'rgba(108, 168, 196, 0)');
+  // Green field only inside the playable surface.
+  const fieldGrad = ctx.createLinearGradient(0, board.top, 0, board.bottom);
+  fieldGrad.addColorStop(0, '#2b6f3a');
+  fieldGrad.addColorStop(1, '#1f5a2f');
+  ctx.fillStyle = fieldGrad;
+  ctx.fillRect(0, board.top, board.width, board.bottom - board.top);
+
+  const sheen = ctx.createRadialGradient(board.width / 2, (board.top + board.bottom) / 2, 80, board.width / 2, (board.top + board.bottom) / 2, board.width * 0.6);
+  sheen.addColorStop(0, 'rgba(179, 229, 165, 0.12)');
+  sheen.addColorStop(1, 'rgba(179, 229, 165, 0)');
   ctx.fillStyle = sheen;
-  ctx.fillRect(0, 0, board.width, board.height);
+  ctx.fillRect(0, board.top, board.width, board.bottom - board.top);
 
-  ctx.strokeStyle = '#3b627a';
+  // Subtle mowing stripes for a sports-field look.
+  for (let x = 0; x < board.width; x += 80) {
+    ctx.fillStyle = (Math.floor(x / 80) % 2 === 0) ? 'rgba(255, 255, 255, 0.035)' : 'rgba(0, 0, 0, 0.03)';
+    ctx.fillRect(x, board.top, 80, board.bottom - board.top);
+  }
+
+  ctx.strokeStyle = '#4b7e58';
   ctx.lineWidth = 2.5;
   ctx.strokeRect(2, board.top, board.width - 4, board.bottom - board.top);
 
-  ctx.strokeStyle = 'rgba(114, 173, 203, 0.12)';
+  ctx.strokeStyle = 'rgba(214, 242, 219, 0.14)';
   ctx.lineWidth = 1;
   for (let y = board.top + 22; y < board.bottom; y += 22) {
     ctx.beginPath();
@@ -603,22 +617,64 @@ function drawBoard(board) {
     ctx.stroke();
   }
 
-  // Subtle endzone fills.
+  // Checker-style endzones with strong team colors.
   const leftZone = ctx.createLinearGradient(0, 0, board.goalLeftX, 0);
-  leftZone.addColorStop(0, 'rgba(122, 212, 255, 0.12)');
-  leftZone.addColorStop(1, 'rgba(122, 212, 255, 0.02)');
+  leftZone.addColorStop(0, '#1a5f7f');
+  leftZone.addColorStop(1, '#2f8bb5');
   ctx.fillStyle = leftZone;
   ctx.fillRect(0, board.top, board.goalLeftX, board.bottom - board.top);
 
   const rightZone = ctx.createLinearGradient(board.goalRightX, 0, board.width, 0);
-  rightZone.addColorStop(0, 'rgba(255, 178, 152, 0.02)');
-  rightZone.addColorStop(1, 'rgba(255, 178, 152, 0.12)');
+  rightZone.addColorStop(0, '#9a553d');
+  rightZone.addColorStop(1, '#bf7659');
   ctx.fillStyle = rightZone;
   ctx.fillRect(board.goalRightX, board.top, board.width - board.goalRightX, board.bottom - board.top);
 
+  const cell = 26;
+  for (let y = board.top; y < board.bottom; y += cell) {
+    const h = Math.min(cell, board.bottom - y);
+    for (let x = 0; x < board.goalLeftX; x += cell) {
+      const w = Math.min(cell, board.goalLeftX - x);
+      const on = ((Math.floor((x + y) / cell)) % 2) === 0;
+      ctx.fillStyle = on ? 'rgba(230, 248, 255, 0.2)' : 'rgba(16, 62, 86, 0.18)';
+      ctx.fillRect(x, y, w, h);
+    }
+    for (let x = board.goalRightX; x < board.width; x += cell) {
+      const w = Math.min(cell, board.width - x);
+      const on = ((Math.floor((x + y) / cell)) % 2) === 0;
+      ctx.fillStyle = on ? 'rgba(255, 238, 230, 0.2)' : 'rgba(123, 64, 42, 0.18)';
+      ctx.fillRect(x, y, w, h);
+    }
+  }
+
+  // Gloss and glow for both checker endzones.
+  const leftSheen = ctx.createLinearGradient(0, board.top, 0, board.top + 90);
+  leftSheen.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+  leftSheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = leftSheen;
+  ctx.fillRect(0, board.top, board.goalLeftX, 90);
+
+  const rightSheen = ctx.createLinearGradient(0, board.top, 0, board.top + 90);
+  rightSheen.addColorStop(0, 'rgba(255, 255, 255, 0.16)');
+  rightSheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = rightSheen;
+  ctx.fillRect(board.goalRightX, board.top, board.width - board.goalRightX, 90);
+
+  const leftGlow = ctx.createRadialGradient(board.goalLeftX - 8, board.height / 2, 8, board.goalLeftX - 8, board.height / 2, 140);
+  leftGlow.addColorStop(0, 'rgba(126, 219, 255, 0.32)');
+  leftGlow.addColorStop(1, 'rgba(126, 219, 255, 0)');
+  ctx.fillStyle = leftGlow;
+  ctx.fillRect(0, board.top, board.goalLeftX + 6, board.bottom - board.top);
+
+  const rightGlow = ctx.createRadialGradient(board.goalRightX + 8, board.height / 2, 8, board.goalRightX + 8, board.height / 2, 140);
+  rightGlow.addColorStop(0, 'rgba(255, 183, 156, 0.32)');
+  rightGlow.addColorStop(1, 'rgba(255, 183, 156, 0)');
+  ctx.fillStyle = rightGlow;
+  ctx.fillRect(board.goalRightX - 6, board.top, board.width - board.goalRightX + 6, board.bottom - board.top);
+
   drawGoalLines(board);
 
-  ctx.strokeStyle = '#4d7894';
+  ctx.strokeStyle = 'rgba(224, 247, 232, 0.55)';
   ctx.lineWidth = 1;
   ctx.setLineDash([7, 7]);
   ctx.beginPath();
