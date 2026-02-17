@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
   --bg0: #080f17;
@@ -200,19 +200,24 @@ button:disabled {
 
 .game-title {
   margin: 2px 0 10px;
-  font-size: 36px;
-  letter-spacing: 0.12em;
-  font-weight: 700;
+  font-family: "Bebas Neue", "Space Grotesk", sans-serif;
+  font-size: 62px;
+  letter-spacing: 0.14em;
+  font-weight: 400;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #f4fbff 0%, #b9d8ea 55%, #84b3cd 100%);
+  background: linear-gradient(180deg, #fff7d2 0%, #ffd26a 20%, #ff9728 52%, #ff4c1f 76%, #a9130f 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.1),
-    0 10px 24px rgba(0, 0, 0, 0.35);
+    0 1px 0 rgba(255, 250, 224, 0.38),
+    0 2px 0 rgba(100, 28, 8, 0.7),
+    0 0 14px rgba(255, 140, 47, 0.42),
+    0 0 28px rgba(255, 86, 28, 0.35),
+    0 14px 30px rgba(0, 0, 0, 0.42);
   position: relative;
-  padding: 0 24px;
+  padding: 0 30px;
+  animation: titleFlame 1.8s ease-in-out infinite;
 }
 
 .game-title::before,
@@ -220,19 +225,48 @@ button:disabled {
   content: "";
   position: absolute;
   top: 52%;
-  width: 180px;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(132, 179, 205, 0), rgba(132, 179, 205, 0.6), rgba(132, 179, 205, 0));
+  width: 270px;
+  height: 38px;
+  transform: translateY(-50%);
 }
 
 .game-title::before {
   right: 100%;
   margin-right: 12px;
+  background:
+    radial-gradient(circle, rgba(121, 224, 255, 0.96) 0 58%, rgba(121, 224, 255, 0) 60%) right center / 28px 28px no-repeat,
+    linear-gradient(90deg, rgba(106, 206, 243, 0) 0%, rgba(106, 206, 243, 0.26) 44%, rgba(106, 206, 243, 0.58) 88%, rgba(106, 206, 243, 0.58) 100%) left center / 252px 11px no-repeat;
+  box-shadow: none;
 }
 
 .game-title::after {
   left: 100%;
   margin-left: 12px;
+  background:
+    radial-gradient(circle, rgba(255, 181, 128, 0.96) 0 58%, rgba(255, 181, 128, 0) 60%) left center / 28px 28px no-repeat,
+    linear-gradient(90deg, rgba(240, 133, 90, 0.58) 0%, rgba(240, 133, 90, 0.58) 12%, rgba(240, 133, 90, 0.26) 56%, rgba(240, 133, 90, 0) 100%) right center / 252px 11px no-repeat;
+  box-shadow: none;
+}
+
+@keyframes titleFlame {
+  0%, 100% {
+    filter: saturate(1) brightness(1);
+    text-shadow:
+      0 1px 0 rgba(255, 250, 224, 0.35),
+      0 2px 0 rgba(100, 28, 8, 0.7),
+      0 0 12px rgba(255, 146, 52, 0.38),
+      0 0 22px rgba(255, 92, 34, 0.3),
+      0 14px 30px rgba(0, 0, 0, 0.42);
+  }
+  50% {
+    filter: saturate(1.15) brightness(1.07);
+    text-shadow:
+      0 1px 0 rgba(255, 251, 232, 0.42),
+      0 2px 0 rgba(100, 28, 8, 0.7),
+      0 0 18px rgba(255, 164, 67, 0.55),
+      0 0 32px rgba(255, 97, 40, 0.48),
+      0 14px 30px rgba(0, 0, 0, 0.42);
+  }
 }
 
 .canvas-wrap {
@@ -349,7 +383,7 @@ canvas {
   }
 
   .game-title {
-    font-size: 28px;
+    font-size: 42px;
     letter-spacing: 0.07em;
     padding: 0;
   }
