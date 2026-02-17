@@ -119,12 +119,16 @@ function resetToLobbyState(message = 'Left room.') {
 }
 
 function renderRoomSearchResults(rooms) {
-  roomSearchResults.innerHTML = '';
   const visibleRooms = (rooms || []).filter((room) => room.roomId !== session.roomId);
   if (visibleRooms.length === 0) {
+    if (roomSearchResults.childElementCount === 0
+      && roomSearchResults.textContent === 'No open rooms found. Ask a host to create one.') {
+      return;
+    }
     roomSearchResults.textContent = 'No open rooms found. Ask a host to create one.';
     return;
   }
+  roomSearchResults.innerHTML = '';
   for (const room of visibleRooms) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -144,7 +148,6 @@ function renderRoomSearchResults(rooms) {
 
 async function searchOpenRooms() {
   try {
-    roomSearchResults.textContent = 'Searching open rooms...';
     const res = await fetch('/api/rooms', { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Room search failed');
